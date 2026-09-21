@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>League Night</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef1f0;
+    --bg-alt: #e4e9e6;
+    --panel: #ffffff;
+    --panel-edge: #d5dbd8;
+    --ink: #1b2420;
+    --ink-soft: #5b6560;
+    --ink-faint: #8c948f;
+    --amber: #c47f1e;
+    --amber-strong: #a8690f;
+    --amber-glow: #f2a93c;
+    --lane: #8a5a2b;
+    --lane-soft: #d9c3a4;
+    --up: #2f7a4f;
+    --down: #b64438;
+    --focus: #1b2420;
+    --radius-sm: 3px;
+    --radius-md: 6px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151a;
+      --bg-alt: #171c22;
+      --panel: #1b2029;
+      --panel-edge: #2b323d;
+      --ink: #e9e7df;
+      --ink-soft: #a6ada8;
+      --ink-faint: #6d746f;
+      --amber: #f2a93c;
+      --amber-strong: #ffc363;
+      --amber-glow: #ffcf7a;
+      --lane: #c99456;
+      --lane-soft: #3a2f22;
+      --up: #5cc98a;
+      --down: #ef7566;
+      --focus: #f2a93c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151a;
+    --bg-alt: #171c22;
+    --panel: #1b2029;
+    --panel-edge: #2b323d;
+    --ink: #e9e7df;
+    --ink-soft: #a6ada8;
+    --ink-faint: #6d746f;
+    --amber: #f2a93c;
+    --amber-strong: #ffc363;
+    --amber-glow: #ffcf7a;
+    --lane: #c99456;
+    --lane-soft: #3a2f22;
+    --up: #5cc98a;
+    --down: #ef7566;
+    --focus: #f2a93c;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--amber); color: #1b2420; }
+  .num { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  a { color: inherit; }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+  }
+  input { font-family: inherit; }
+
+  /* ---------- Header ---------- */
+  header.top {
+    position: sticky; top: 0; z-index: 20;
+    padding-top: env(safe-area-inset-top, 0px);
+    background: var(--bg);
+    border-bottom: 2px solid var(--lane);
+  }
+  .top-inner {
+    max-width: 980px; margin: 0 auto;
+    padding: 14px 18px 0 18px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .brand-mark { font-size: 22px; line-height: 1; }
+  .brand-name {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
+    background: transparent; border: none; color: var(--ink);
+    padding: 2px 4px; border-radius: var(--radius-sm); min-width: 60px; max-width: 46vw;
+  }
+  .brand-name:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+  .theme-toggle {
+    background: none; border: 1px solid var(--panel-edge); border-radius: 999px;
+    width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: var(--ink-soft);
+  }
+  .theme-toggle:hover { border-color: var(--amber); color: var(--amber); }
+
+  nav.tabs {
+    max-width: 980px; margin: 12px auto 0 auto;
+    padding: 0 18px;
+    display: flex; gap: 4px; overflow-x: auto;
+  }
+  nav.tabs button {
+    background: none; border: none; border-bottom: 3px solid transparent;
+    color: var(--ink-soft); font-size: 14px; font-weight: 600;
+    padding: 9px 12px 10px 12px; white-space: nowrap;
+  }
+  nav.tabs button.active { color: var(--ink); border-bottom-color: var(--amber); }
+  nav.tabs button:hover:not(.active) { color: var(--ink); }
+  nav.tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+  /* ---------- Layout ---------- */
+  main { max-width: 980px; margin: 0 auto; padding: 22px 18px 80px 18px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .status-bar {
+    display: none;
+    max-width: 980px; margin: 10px auto 0 auto; padding: 8px 18px;
+    font-size: 13px; color: var(--down);
+  }
+  .status-bar.show { display: block; }
+
+  h1.page-title { font-size: 22px; margin: 0 0 4px 0; letter-spacing: -0.01em; }
+  p.page-sub { color: var(--ink-soft); margin: 0 0 22px 0; font-size: 14px; max-width: 56ch; line-height: 1.5; }
+
+  section.block { margin-bottom: 32px; }
+  h2.block-title {
+    font-size: 13px; font-weight: 600; text-transform: none; color: var(--ink-soft);
+    margin: 0 0 10px 0; padding-bottom: 8px; border-bottom: 1px solid var(--panel-edge);
+  }
+
+  .empty-state {
+    border: 1.5px dashed var(--panel-edge); border-radius: var(--radius-md);
+    padding: 28px 20px; text-align: left; color: var(--ink-soft); font-size: 14px; line-height: 1.6;
+  }
+  .empty-state strong { color: var(--ink); display: block; margin-bottom: 4px; font-size: 15px; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: var(--radius-sm); border: 1px solid var(--panel-edge);
+    background: var(--panel); color: var(--ink);
+    font-size: 13.5px; font-weight: 600; padding: 8px 14px;
+  }
+  .btn:hover { border-color: var(--amber); }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .btn-primary { background: var(--amber); border-color: var(--amber); color: #1b1200; }
+  .btn-primary:hover { background: var(--amber-strong); border-color: var(--amber-strong); }
+  .btn-quiet { border-color: transparent; background: none; color: var(--ink-soft); padding: 8px 8px; }
+  .btn-quiet:hover { color: var(--down); }
+  .btn-sm { padding: 5px 10px; font-size: 12.5px; }
+  .btn[disabled] { opacity: 0.45; pointer-events: none; }
+
+  /* ---------- Forms ---------- */
+  .field-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--ink-soft); }
+  .field input, .field select {
+    border: 1px solid var(--panel-edge); border-radius: var(--radius-sm);
+    background: var(--panel); color: var(--ink); padding: 8px 10px; font-size: 14px;
+    min-width: 0;
+  }
+  .field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+  /* ---------- Cards / roster ---------- */
+  .team-card {
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: var(--radius-md);
+    padding: 14px 16px; margin-bottom: 12px;
+  }
+  .team-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .team-card-head h3 { margin: 0; font-size: 15.5px; display: flex; align-items: center; gap: 8px; }
+  .team-swatch { width: 10px; height: 10px; border-radius: 2px; background: var(--lane); flex: none; }
+  .bowler-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 0; border-top: 1px solid var(--bg-alt); font-size: 14px;
+  }
+  .bowler-row:first-of-type { border-top: none; }
+  .bowler-meta { color: var(--ink-faint); font-size: 12.5px; }
+  .row-actions { display: flex; gap: 4px; }
+  .icon-btn {
+    background: none; border: none; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; border-radius: var(--radius-sm);
+  }
+  .icon-btn:hover { color: var(--down); background: var(--bg-alt); }
+
+  /* ---------- Entry grid ---------- */
+  .week-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .week-bar select { border: 1px solid var(--panel-edge); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink); padding: 8px 10px; font-size: 14.5px; font-weight: 600; }
+  .save-indicator { font-size: 12.5px; color: var(--up); opacity: 0; transition: opacity .25s; }
+  .save-indicator.show { opacity: 1; }
+
+  table.entry-grid { width: 100%; border-collapse: collapse; }
+  table.entry-grid caption {
+    text-align: left; font-size: 13px; font-weight: 600; color: var(--lane);
+    padding: 14px 0 6px 0; border-bottom: 1px solid var(--panel-edge);
+  }
+  table.entry-grid caption:first-child { padding-top: 0; }
+  table.entry-grid th {
+    text-align: left; font-size: 11.5px; color: var(--ink-faint); font-weight: 600;
+    padding: 6px 6px; border-bottom: 1px solid var(--panel-edge);
+  }
+  table.entry-grid td { padding: 5px 6px; vertical-align: middle; }
+  table.entry-grid .th-num, table.entry-grid td.num-cell { text-align: center; width: 64px; }
+  .bowler-name-cell { min-width: 130px; font-size: 14px; }
+  .bowler-name-cell .avg { color: var(--ink-faint); font-size: 11.5px; display: block; }
+  input.score-input {
+    width: 56px; text-align: center; padding: 8px 4px; font-size: 15px;
+    border: 1px solid var(--panel-edge); border-radius: var(--radius-sm);
+    background: var(--panel); color: var(--ink);
+  }
+  input.score-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--amber); }
+  input.score-input.dirty { border-color: var(--amber); }
+  td.derived { font-size: 14.5px; font-weight: 600; text-align: center; }
+  td.derived .sub { display: block; font-size: 11px; font-weight: 400; color: var(--ink-faint); }
+
+  .matchup-panel { margin-top: 22px; border-top: 1px dashed var(--panel-edge); padding-top: 16px; }
+  .matchup-list { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .matchup-chip {
+    display: flex; align-items: center; gap: 8px; font-size: 13.5px;
+    background: var(--bg-alt); border-radius: var(--radius-sm); padding: 6px 10px; width: fit-content;
+  }
+  .matchup-chip .vs { color: var(--ink-faint); font-size: 11px; }
+
+  /* ---------- Results ---------- */
+  .result-card {
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: var(--radius-md);
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .result-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 16px; border-bottom: 1px solid var(--panel-edge); background: var(--bg-alt);
+    flex-wrap: wrap;
+  }
+  .result-head .vs-line { font-size: 15px; font-weight: 600; }
+  .result-head .vs-sep { color: var(--ink-faint); font-weight: 400; margin: 0 6px; font-size: 12px; }
+  .result-points { font-size: 13px; color: var(--ink-soft); }
+  .result-points b { color: var(--ink); font-family: 'IBM Plex Mono', monospace; }
+  table.game-compare { width: 100%; border-collapse: collapse; }
+  table.game-compare th {
+    font-size: 11px; color: var(--ink-faint); font-weight: 600; text-align: center; padding: 8px 4px;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  table.game-compare th.team-label-th { text-align: left; }
+  table.game-compare td { text-align: center; padding: 8px 4px; font-size: 14.5px; }
+  table.game-compare td.team-label { text-align: left; font-weight: 600; padding-left: 16px; }
+  table.game-compare td.winner { color: var(--up); font-weight: 700; }
+  table.game-compare tr.team-row-b td { border-top: 1px solid var(--bg-alt); }
+  .no-matchup-note { padding: 12px 16px; font-size: 13px; color: var(--ink-faint); }
+
+  .roster-compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    border-top: 1px dashed var(--panel-edge);
+  }
+  .roster-compare .side { padding: 12px 16px; }
+  .roster-compare .side:first-child { border-right: 1px dashed var(--panel-edge); }
+  .roster-compare .side h4 { margin: 0 0 8px 0; font-size: 12.5px; font-weight: 600; color: var(--lane); }
+  table.mini-roster { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.mini-roster th { text-align: center; font-size: 10.5px; color: var(--ink-faint); font-weight: 600; padding: 3px 2px; }
+  table.mini-roster th.name-th { text-align: left; }
+  table.mini-roster td { text-align: center; padding: 4px 2px; }
+  table.mini-roster td.name-td { text-align: left; }
+  table.mini-roster td.series-td { font-weight: 600; }
+  @media (max-width: 640px) {
+    .roster-compare { grid-template-columns: 1fr; }
+    .roster-compare .side:first-child { border-right: none; border-bottom: 1px dashed var(--panel-edge); }
+  }
+  .no-week-note { font-size: 13px; color: var(--ink-faint); padding: 4px 0 18px 0; }
+  .matchup-section { margin-top: 26px; }
+  .matchup-section:first-child { margin-top: 0; }
+  .matchup-section .vs-line { font-size: 16px; }
+
+  /* ---------- Bowler detail expand ---------- */
+  tr.bowler-row-clickable { cursor: pointer; }
+  tr.bowler-row-clickable:hover td { background: var(--bg-alt); }
+  tr.bowler-detail-row td { padding: 0; }
+  .bowler-detail-inner { padding: 4px 8px 16px 8px; background: var(--bg-alt); }
+  table.week-log { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.week-log th { font-size: 10.5px; color: var(--ink-faint); font-weight: 600; text-align: center; padding: 5px 4px; }
+  table.week-log th.week-th { text-align: left; }
+  table.week-log td { font-size: 13px; text-align: center; padding: 5px 4px; }
+  table.week-log td.week-td { text-align: left; }
+  .disclosure-icon { display: inline-block; margin-right: 6px; color: var(--ink-faint); font-size: 11px; transition: transform .15s; }
+  tr.expanded .disclosure-icon { transform: rotate(90deg); }
+
+  .carry-in-row { display: flex; gap: 10px; margin-top: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .carry-in-row .field input { width: 100px; }
+  .carry-in-note { font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; }
+
+  /* ---------- Schedule ---------- */
+  .schedule-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .schedule-week {
+    margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--panel-edge);
+  }
+  .schedule-week-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .schedule-week-head .wk-num { font-size: 15px; font-weight: 700; }
+  .schedule-week-head .wk-date { font-size: 12.5px; color: var(--ink-faint); }
+  .schedule-week-head .wk-tag { font-size: 10.5px; color: var(--lane); border: 1px solid var(--lane-soft); border-radius: 999px; padding: 1px 8px; }
+  .schedule-week-head .wk-shuffle { margin-left: auto; }
+  .schedule-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .schedule-chip {
+    background: var(--bg-alt); border: 1px solid transparent; border-radius: var(--radius-sm);
+    padding: 7px 11px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap; row-gap: 2px;
+  }
+  .schedule-chip:hover { border-color: var(--amber); }
+  .schedule-chip .vs { color: var(--ink-faint); font-size: 10.5px; }
+  .schedule-chip.played { background: var(--lane-soft); }
+  .schedule-chip .chip-score { font-family: 'IBM Plex Mono', monospace; color: var(--ink-soft); font-size: 12px; margin: 0 1px; }
+  .schedule-chip .chip-win { font-weight: 700; }
+  .schedule-chip .chip-result { color: var(--up); font-size: 12px; margin-left: 4px; white-space: nowrap; }
+  .schedule-chip .chip-tie { color: var(--ink-soft); font-size: 12px; margin-left: 4px; }
+
+  /* ---------- Standings ---------- */
+  table.standings { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  table.standings th {
+    text-align: left; font-size: 11.5px; color: var(--ink-faint); font-weight: 600;
+    padding: 8px 8px; border-bottom: 1px solid var(--panel-edge);
+  }
+  table.standings td { padding: 10px 8px; font-size: 14.5px; border-bottom: 1px solid var(--bg-alt); }
+  table.standings tr:last-child td { border-bottom: none; }
+  table.standings .rank { color: var(--ink-faint); width: 26px; }
+  table.standings .num-col { text-align: right; font-weight: 600; }
+  table.standings tbody tr:hover { background: var(--bg-alt); }
+
+  .stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 26px; }
+  .tile { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: var(--radius-md); padding: 14px 16px; }
+  .tile .tile-label { font-size: 11.5px; color: var(--ink-faint); margin-bottom: 6px; }
+  .tile .tile-value { font-size: 24px; font-weight: 600; }
+  .tile .tile-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+  .spark { display: block; margin-top: 4px; }
+
+  footer.foot { max-width: 980px; margin: 0 auto; padding: 0 18px 40px 18px; color: var(--ink-faint); font-size: 12px; }
+
+  @media (max-width: 640px) {
+    .bowler-name-cell { min-width: 96px; }
+    input.score-input { width: 44px; padding: 7px 2px; font-size: 14px; }
+    table.entry-grid .th-num, table.entry-grid td.num-cell { width: 48px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <span class="brand-mark">🎳</span>
+      <input class="brand-name" id="leagueNameInput" value="League Night" aria-label="League name" />
+    </div>
+    <div class="header-actions">
+      <button class="theme-toggle" id="themeToggle" title="Toggle lights" aria-label="Toggle light/dark">◐</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="entry" class="active">Enter scores</button>
+    <button data-tab="schedule">Schedule</button>
+    <button data-tab="results">Results</button>
+    <button data-tab="standings">Standings</button>
+    <button data-tab="bowlers">Bowler stats</button>
+    <button data-tab="setup">Setup</button>
+  </nav>
+</header>
+
+<div class="status-bar" id="statusBar"></div>
+
+<main>
+
+  <!-- ENTRY -->
+  <section class="view active" id="view-entry">
+    <h1 class="page-title">Enter scores</h1>
+    <p class="page-sub">Pick a week, then tab through the grid. Games save automatically as you go — you can also paste three scores at once into the first box of a row.</p>
+    <div id="entryContent"></div>
+  </section>
+
+  <!-- SCHEDULE -->
+  <section class="view" id="view-schedule">
+    <h1 class="page-title">Schedule</h1>
+    <p class="page-sub">All 33 weeks, side by side. Click any matchup to jump to its scores.</p>
+    <div id="scheduleContent"></div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="view" id="view-results">
+    <h1 class="page-title">Results</h1>
+    <p class="page-sub">Each week's matchups, team vs team — scores, winner, and points. Individual bowler scores live under Bowler Stats.</p>
+    <div id="resultsContent"></div>
+  </section>
+
+  <!-- STANDINGS -->
+  <section class="view" id="view-standings">
+    <h1 class="page-title">Standings</h1>
+    <p class="page-sub">Team totals for the season, updated as scores come in.</p>
+    <div id="standingsContent"></div>
+  </section>
+
+  <!-- BOWLERS -->
+  <section class="view" id="view-bowlers">
+    <h1 class="page-title">Bowler stats</h1>
+    <p class="page-sub">Averages, handicaps, and personal bests for every bowler in the league.</p>
+    <div id="bowlersContent"></div>
+  </section>
+
+  <!-- SETUP -->
+  <section class="view" id="view-setup">
+    <h1 class="page-title">Setup</h1>
+    <p class="page-sub">Teams, bowlers, and how the league scores a week.</p>
+    <div id="setupContent"></div>
+  </section>
+
+</main>
+
+<footer class="foot">Data is shared with everyone who opens this page.</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------
+  var state = {
+    ready: false,
+    connected: false,
+    settings: { leagueName: "League Night", gamesPerWeek: 3, handicapBase: 220, handicapPercent: 0.9, scratchLeague: false },
+    teams: [],       // {id, name}
+    bowlers: [],     // {id, name, teamId, enteringAvg}
+    weeks: [],       // {id, number, date, matchups: [{teamA, teamB}]}
+    scores: [],       // {id, weekId, bowlerId, games:[n,n,n]}
+    activeWeekId: null,
+    bulkOperationInProgress: false,
+    simProgressText: ""
+  };
+
+  var db = null;
+  var dlAPI = null;
+  var unsubs = [];
+  var settingsLoaded = false;
+
+  // ---------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------
+  function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4); }
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    var d = new Date(iso + "T12:00:00");
+    if (isNaN(d)) return iso;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  function round1(n) { return Math.round(n * 10) / 10; }
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function byId(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
+  function debounce(fn, ms) {
+    var t = {};
+    return function (key) {
+      var args = arguments;
+      clearTimeout(t[key]);
+      t[key] = setTimeout(function () { fn.apply(null, args); }, ms);
+    };
+  }
+  function setStatus(msg) {
+    var el = document.getElementById("statusBar");
+    if (!msg) { el.classList.remove("show"); el.textContent = ""; return; }
+    el.textContent = msg;
+    el.classList.add("show");
+  }
+
+  // ---------------------------------------------------------------
+  // Derived data helpers
+  // ---------------------------------------------------------------
+  function scoresForBowler(bowlerId, excludeWeekId) {
+    var out = [];
+    for (var i = 0; i < state.scores.length; i++) {
+      var s = state.scores[i];
+      if (s.bowlerId !== bowlerId) continue;
+      if (excludeWeekId && s.weekId === excludeWeekId) continue;
+      out.push(s);
+    }
+    return out;
+  }
+  function allGamesForBowler(bowlerId, excludeWeekId) {
+    var scores = scoresForBowler(bowlerId, excludeWeekId);
+    var games = [];
+    scores.forEach(function (s) {
+      (s.games || []).forEach(function (g) { if (typeof g === "number" && !isNaN(g)) games.push(g); });
+    });
+    return games;
+  }
+  function bowlerAverage(bowlerId, excludeWeekId) {
+    var b = byId(state.bowlers, bowlerId);
+    var games = allGamesForBowler(bowlerId, excludeWeekId);
+    if (games.length === 0) {
+      return (b && typeof b.enteringAvg === "number") ? b.enteringAvg : state.settings.handicapBase;
+    }
+    var sum = games.reduce(function (a, g) { return a + g; }, 0);
+    return sum / games.length;
+  }
+  function bowlerHandicap(bowlerId, excludeWeekId) {
+    if (state.settings.scratchLeague) return 0;
+    var avg = bowlerAverage(bowlerId, excludeWeekId);
+    var hdcp = (state.settings.handicapBase - avg) * state.settings.handicapPercent;
+    return Math.max(0, Math.round(hdcp));
+  }
+  function bowlerGamesCount(bowlerId) { return allGamesForBowler(bowlerId).length; }
+  function bowlerHighGame(bowlerId) {
+    var games = allGamesForBowler(bowlerId);
+    return games.length ? Math.max.apply(null, games) : null;
+  }
+  function bowlerHighSeries(bowlerId) {
+    var scores = scoresForBowler(bowlerId);
+    var best = null;
+    scores.forEach(function (s) {
+      var valid = (s.games || []).filter(function (g) { return typeof g === "number" && !isNaN(g); });
+      if (!valid.length) return;
+      var sum = valid.reduce(function (a, g) { return a + g; }, 0);
+      if (best === null || sum > best) best = sum;
+    });
+    return best;
+  }
+  function scoreDocFor(weekId, bowlerId) {
+    for (var i = 0; i < state.scores.length; i++) {
+      var s = state.scores[i];
+      if (s.weekId === weekId && s.bowlerId === bowlerId) return s;
+    }
+    return null;
+  }
+  function teamBowlers(teamId) { return state.bowlers.filter(function (b) { return b.teamId === teamId; }); }
+
+  function teamWeekTotals(teamId, weekId, handicap) {
+    // returns { perGame:[sum,...], series }
+    var bowlers = teamBowlers(teamId);
+    var per = [];
+    for (var g = 0; g < state.settings.gamesPerWeek; g++) per.push(0);
+    var series = 0;
+    bowlers.forEach(function (b) {
+      var doc = scoreDocFor(weekId, b.id);
+      var hdcp = handicap ? bowlerHandicap(b.id) : 0;
+      for (var g2 = 0; g2 < state.settings.gamesPerWeek; g2++) {
+        var val = doc && typeof doc.games[g2] === "number" ? doc.games[g2] : 0;
+        var withH = val ? val + hdcp : 0;
+        per[g2] += withH;
+        series += withH;
+      }
+    });
+    return { perGame: per, series: series };
+  }
+
+  function teamSeasonTotal(teamId, handicap) {
+    var team = byId(state.teams, teamId);
+    var total = handicap && team && typeof team.startPins === "number" ? team.startPins : 0;
+    state.weeks.forEach(function (w) {
+      total += teamWeekTotals(teamId, w.id, handicap).series;
+    });
+    return total;
+  }
+
+  function teamSeasonPoints(teamId) {
+    var team = byId(state.teams, teamId);
+    var pts = (team && typeof team.startPoints === "number") ? team.startPoints : 0;
+    state.weeks.forEach(function (w) {
+      (w.matchups || []).forEach(function (m) {
+        if (m.teamA !== teamId && m.teamB !== teamId) return;
+        var opp = m.teamA === teamId ? m.teamB : m.teamA;
+        var mine = teamWeekTotals(teamId, w.id, true);
+        var theirs = teamWeekTotals(opp, w.id, true);
+        for (var g = 0; g < state.settings.gamesPerWeek; g++) {
+          if (mine.perGame[g] > theirs.perGame[g]) pts += 1;
+          else if (mine.perGame[g] === theirs.perGame[g] && mine.perGame[g] > 0) pts += 0.5;
+        }
+        if (mine.series > theirs.series) pts += 1;
+        else if (mine.series === theirs.series && mine.series > 0) pts += 0.5;
+      });
+    });
+    return pts;
+  }
+
+  function leagueHasMatchups() {
+    return state.weeks.some(function (w) { return (w.matchups || []).length > 0; });
+  }
+
+  // ---------------------------------------------------------------
+  // Tabs
+  // ---------------------------------------------------------------
+  function showTab(name) {
+    document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
+    document.getElementById("view-" + name).classList.add("active");
+    document.querySelectorAll("#tabs button").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-tab") === name);
+    });
+    renderActiveTab(name);
+    try { history.replaceState(null, "", "#" + name); } catch (e) {}
+  }
+  document.getElementById("tabs").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-tab]");
+    if (b) showTab(b.getAttribute("data-tab"));
+  });
+
+  function currentTabName() {
+    var active = document.querySelector("#tabs button.active");
+    return active ? active.getAttribute("data-tab") : "entry";
+  }
+  function renderActiveTab(name) {
+    name = name || currentTabName();
+    if (name === "entry") renderEntry();
+    else if (name === "schedule") renderSchedule();
+    else if (name === "results") renderResults();
+    else if (name === "standings") renderStandings();
+    else if (name === "bowlers") renderBowlers();
+    else if (name === "setup") renderSetup();
+  }
+  function renderAll() { renderActiveTab(); }
+
+  // ---------------------------------------------------------------
+  // Theme toggle
+  // ---------------------------------------------------------------
+  (function initTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem("bowling-theme"); } catch (e) {}
+    if (saved === "light" || saved === "dark") document.documentElement.setAttribute("data-theme", saved);
+    document.getElementById("themeToggle").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme");
+      var mql = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      var next;
+      if (!cur) next = mql ? "light" : "dark";
+      else next = cur === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("bowling-theme", next); } catch (e) {}
+    });
+  })();
+
+  // ---------------------------------------------------------------
+  // League name edit
+  // ---------------------------------------------------------------
+  var leagueNameInput = document.getElementById("leagueNameInput");
+  leagueNameInput.addEventListener("change", function () {
+    var v = leagueNameInput.value.trim() || "League Night";
+    leagueNameInput.value = v;
+    document.title = v;
+    state.settings.leagueName = v;
+    saveSettings();
+  });
+
+  function saveSettings() {
+    if (!db) return;
+    db.doc("settings/league").set(state.settings).catch(function () {});
+  }
+
+  // ---------------------------------------------------------------
+  // Rendering: ENTRY
+  // ---------------------------------------------------------------
+  var saveScoreDebounced = debounce(function (key, weekId, bowlerId, games, rowEl) {
+    if (!db) { flashSave(rowEl, false); return; }
+    var docId = weekId + "__" + bowlerId;
+    db.collection("scores").doc(docId).set({ weekId: weekId, bowlerId: bowlerId, games: games, updatedAt: Date.now() })
+      .then(function () { flashSave(rowEl, true); })
+      .catch(function () { flashSave(rowEl, false); });
+  }, 450);
+
+  function flashSave(rowEl, ok) {
+    if (!rowEl) return;
+    var ind = rowEl.querySelector(".save-indicator");
+    if (!ind) return;
+    ind.textContent = ok ? "Saved" : "Not saved";
+    ind.style.color = ok ? "var(--up)" : "var(--down)";
+    ind.classList.add("show");
+    clearTimeout(ind._t);
+    ind._t = setTimeout(function () { ind.classList.remove("show"); }, 1400);
+  }
+
+  function renderEntry() {
+    var el = document.getElementById("entryContent");
+    if (!state.ready) { el.innerHTML = loadingHtml(); return; }
+    if (state.teams.length === 0 || state.bowlers.length === 0) {
+      el.innerHTML =
+        '<div class="empty-state"><strong>No roster yet</strong>Add your teams and bowlers in Setup first — it takes a minute, then every week after this is fast.</div>';
+      return;
+    }
+    if (state.weeks.length === 0) {
+      el.innerHTML =
+        '<div class="empty-state" style="margin-bottom:16px"><strong>No weeks yet</strong>Start week 1 to open the score grid.</div>' +
+        '<button class="btn btn-primary" id="firstWeekBtn">Start week 1</button>';
+      document.getElementById("firstWeekBtn").addEventListener("click", function () { createWeek(); });
+      return;
+    }
+    if (!state.activeWeekId || !byId(state.weeks, state.activeWeekId)) {
+      state.activeWeekId = state.weeks[state.weeks.length - 1].id;
+    }
+
+    var weekOptions = state.weeks
+      .slice()
+      .sort(function (a, b) { return a.number - b.number; })
+      .map(function (w) {
+        return '<option value="' + w.id + '"' + (w.id === state.activeWeekId ? " selected" : "") + '>Week ' + w.number + (w.date ? " — " + fmtDate(w.date) : "") + "</option>";
+      }).join("");
+
+    var html = '<div class="week-bar">' +
+      '<select id="weekSelect">' + weekOptions + '</select>' +
+      '<button class="btn btn-sm" id="newWeekBtn">+ New week</button>' +
+      '<button class="btn btn-quiet btn-sm" id="deleteWeekBtn">Delete this week</button>' +
+      '</div>';
+
+    var week = byId(state.weeks, state.activeWeekId);
+    var gcount = state.settings.gamesPerWeek;
+    var useH = !state.settings.scratchLeague;
+
+    var gameHeaders = "";
+    for (var g = 0; g < gcount; g++) gameHeaders += '<th class="th-num">G' + (g + 1) + "</th>";
+
+    var teamsSorted = state.teams.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+
+    function buildTeamRows(team) {
+      var bowlers = teamBowlers(team.id).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      if (!bowlers.length) return "";
+      var rows = '<tr><td colspan="' + (gcount + (useH ? 3 : 2)) + '" style="padding-top:16px;padding-bottom:4px;border-bottom:1px solid var(--panel-edge);font-size:13px;font-weight:600;color:var(--lane);">' + escapeHtml(team.name) + "</td></tr>";
+      bowlers.forEach(function (b) {
+        var doc = scoreDocFor(week.id, b.id);
+        var games = doc ? doc.games.slice() : [];
+        while (games.length < gcount) games.push(null);
+        var avg = bowlerAverage(b.id, week.id);
+        var hdcp = bowlerHandicap(b.id, week.id);
+        var validGames = games.filter(function (v) { return typeof v === "number"; });
+        var series = validGames.length ? validGames.reduce(function (a, v) { return a + v; }, 0) : null;
+        var hdcpSeries = series !== null ? series + hdcp * gcount : null;
+
+        rows += '<tr data-bowler="' + b.id + '">';
+        rows += '<td class="bowler-name-cell">' + escapeHtml(b.name) +
+          '<span class="avg num">avg ' + round1(avg) + (useH ? " · hdcp " + hdcp : "") + '</span></td>';
+        for (var gi = 0; gi < gcount; gi++) {
+          var val = games[gi] === null || games[gi] === undefined ? "" : games[gi];
+          rows += '<td class="num-cell"><input class="score-input num" inputmode="numeric" pattern="[0-9]*" maxlength="3" data-game="' + gi + '" value="' + val + '" aria-label="' + escapeHtml(b.name) + " game " + (gi + 1) + '"></td>';
+        }
+        rows += '<td class="derived num">' + (series !== null ? series : "–") + '</td>';
+        if (useH) rows += '<td class="derived num">' + (hdcpSeries !== null ? hdcpSeries : "–") + '</td>';
+        rows += '<td class="save-indicator" style="white-space:nowrap;">Saved</td>';
+        rows += '</tr>';
+      });
+      return rows;
+    }
+
+    function gridTable(rowsHtml) {
+      return '<table class="entry-grid"><thead><tr><th></th>' + gameHeaders +
+        '<th class="th-num">Series</th>' + (useH ? '<th class="th-num">Hdcp</th>' : "") + '<th></th></tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+    }
+
+    var matchups = week.matchups || [];
+    var matchedIds = {};
+    var sectionsHtml = "";
+
+    matchups.forEach(function (m) {
+      matchedIds[m.teamA] = true; matchedIds[m.teamB] = true;
+      var ta = byId(state.teams, m.teamA), tb = byId(state.teams, m.teamB);
+      sectionsHtml += '<div class="matchup-section"><div class="result-head" style="background:none;border:none;padding:0 0 10px 0;">' +
+        '<div class="vs-line">' + escapeHtml(ta ? ta.name : "?") + '<span class="vs-sep">vs</span>' + escapeHtml(tb ? tb.name : "?") + '</div></div>';
+      sectionsHtml += gridTable(buildTeamRows(ta || { id: m.teamA, name: "?" }) + buildTeamRows(tb || { id: m.teamB, name: "?" }));
+      sectionsHtml += '</div>';
+    });
+
+    var others = teamsSorted.filter(function (t) { return !matchedIds[t.id]; });
+    if (others.length) {
+      if (matchups.length) sectionsHtml += '<h2 class="block-title" style="margin-top:26px">Other teams this week</h2>';
+      sectionsHtml += gridTable(others.map(buildTeamRows).join(""));
+    }
+
+    html += sectionsHtml;
+
+    // matchups
+    html += '<div class="matchup-panel"><h2 class="block-title">Matchups this week (optional)</h2>';
+    html += '<p style="font-size:13px;color:var(--ink-soft);margin:0 0 8px 0;">Pair up teams to track points, not just pins. Skip this if your league just tracks individual stats.</p>';
+    html += '<div class="matchup-list">';
+    (week.matchups || []).forEach(function (m, idx) {
+      var ta = byId(state.teams, m.teamA), tb = byId(state.teams, m.teamB);
+      html += '<div class="matchup-chip">' + escapeHtml(ta ? ta.name : "?") + ' <span class="vs">vs</span> ' + escapeHtml(tb ? tb.name : "?") +
+        '<button class="icon-btn" data-remove-matchup="' + idx + '" aria-label="Remove matchup">✕</button></div>';
+    });
+    html += '</div>';
+    if (teamsSorted.length >= 2) {
+      html += '<div class="field-row"><div class="field"><label>Team</label><select id="matchupA">' +
+        teamsSorted.map(function (t) { return '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>'; }).join('') +
+        '</select></div><div class="field"><label>vs.</label><select id="matchupB">' +
+        teamsSorted.map(function (t) { return '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>'; }).join('') +
+        '</select></div><button class="btn btn-sm" id="addMatchupBtn">Add matchup</button></div>';
+    }
+    html += '</div>';
+
+    el.innerHTML = html;
+
+    document.getElementById("weekSelect").addEventListener("change", function (e) {
+      state.activeWeekId = e.target.value;
+      renderEntry();
+    });
+    document.getElementById("newWeekBtn").addEventListener("click", function () { createWeek(); });
+    document.getElementById("deleteWeekBtn").addEventListener("click", function () { deleteWeek(week.id); });
+
+    var addBtn = document.getElementById("addMatchupBtn");
+    if (addBtn) addBtn.addEventListener("click", function () {
+      var a = document.getElementById("matchupA").value;
+      var b2 = document.getElementById("matchupB").value;
+      if (a === b2) return;
+      addMatchup(week.id, a, b2);
+    });
+    el.querySelectorAll("[data-remove-matchup]").forEach(function (btn) {
+      btn.addEventListener("click", function () { removeMatchup(week.id, parseInt(btn.getAttribute("data-remove-matchup"), 10)); });
+    });
+
+    wireEntryInputs(el, week.id);
+  }
+
+  function wireEntryInputs(root, weekId) {
+    var inputs = Array.prototype.slice.call(root.querySelectorAll("input.score-input"));
+
+    function commitRow(rowEl) {
+      var bowlerId = rowEl.getAttribute("data-bowler");
+      var rowInputs = rowEl.querySelectorAll("input.score-input");
+      var games = [];
+      rowInputs.forEach(function (inp) {
+        var v = inp.value.trim();
+        if (v === "") { games.push(null); return; }
+        var n = parseInt(v, 10);
+        if (isNaN(n) || n < 0) n = 0;
+        if (n > 300) n = 300;
+        games.push(n);
+      });
+      // update derived cells live
+      var valid = games.filter(function (g) { return typeof g === "number"; });
+      var series = valid.length ? valid.reduce(function (a, g) { return a + g; }, 0) : null;
+      var derivedCells = rowEl.querySelectorAll("td.derived.num");
+      if (derivedCells[0]) derivedCells[0].textContent = series !== null ? series : "–";
+      if (derivedCells[1]) {
+        var hdcp = bowlerHandicap(bowlerId, weekId);
+        derivedCells[1].textContent = series !== null ? (series + hdcp * games.length) : "–";
+      }
+      saveScoreDebounced(weekId + "_" + bowlerId, weekId, bowlerId, games, rowEl);
+    }
+
+    inputs.forEach(function (inp, idx) {
+      inp.addEventListener("focus", function () { inp.select(); });
+      inp.addEventListener("input", function () {
+        inp.value = inp.value.replace(/[^0-9]/g, "").slice(0, 3);
+        inp.classList.add("dirty");
+        commitRow(inp.closest("tr"));
+        if (inp.value.length >= 3) focusNext(idx);
+      });
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); focusNext(idx); }
+      });
+      inp.addEventListener("paste", function (e) {
+        var text = (e.clipboardData || window.clipboardData).getData("text");
+        var nums = text.match(/\d+/g);
+        if (!nums || nums.length < 2) return; // let default paste happen for a single number
+        e.preventDefault();
+        var rowEl = inp.closest("tr");
+        var rowInputs = Array.prototype.slice.call(rowEl.querySelectorAll("input.score-input"));
+        var startIdx = rowInputs.indexOf(inp);
+        for (var i = 0; i < nums.length && (startIdx + i) < rowInputs.length; i++) {
+          var n = Math.min(300, parseInt(nums[i], 10));
+          rowInputs[startIdx + i].value = isNaN(n) ? "" : String(n);
+        }
+        commitRow(rowEl);
+      });
+    });
+
+    function focusNext(idx) {
+      var next = inputs[idx + 1];
+      if (next) next.focus();
+      else inputs[idx].blur();
+    }
+  }
+
+  function createWeek() {
+    var nextNum = state.weeks.reduce(function (m, w) { return Math.max(m, w.number); }, 0) + 1;
+    var w = { id: uid(), number: nextNum, date: todayISO(), matchups: [] };
+    if (!db) { state.weeks.push(w); state.activeWeekId = w.id; renderEntry(); return; }
+    db.collection("weeks").doc(w.id).set(w).then(function () {
+      state.activeWeekId = w.id;
+    }).catch(function () {});
+  }
+  function deleteWeek(weekId) {
+    if (!confirm("Delete this week and its scores? This can't be undone.")) return;
+    if (!db) return;
+    db.collection("weeks").doc(weekId).delete().catch(function () {});
+    state.scores.filter(function (s) { return s.weekId === weekId; }).forEach(function (s) {
+      db.collection("scores").doc(s.id).delete().catch(function () {});
+    });
+    state.activeWeekId = null;
+  }
+  function addMatchup(weekId, teamA, teamB) {
+    var w = byId(state.weeks, weekId);
+    if (!w) return;
+    var matchups = (w.matchups || []).concat([{ teamA: teamA, teamB: teamB }]);
+    if (!db) { w.matchups = matchups; renderEntry(); return; }
+    db.collection("weeks").doc(weekId).update({ matchups: matchups }).catch(function () {});
+  }
+  function removeMatchup(weekId, idx) {
+    var w = byId(state.weeks, weekId);
+    if (!w) return;
+    var matchups = (w.matchups || []).slice();
+    matchups.splice(idx, 1);
+    if (!db) { w.matchups = matchups; renderEntry(); return; }
+    db.collection("weeks").doc(weekId).update({ matchups: matchups }).catch(function () {});
+  }
+
+  // ---------------------------------------------------------------
+  // Season simulation (demo data)
+  // ---------------------------------------------------------------
+  function randNormalish(mean, sd) {
+    var s = 0;
+    for (var i = 0; i < 4; i++) s += Math.random();
+    var z = (s - 2) / Math.sqrt(4 / 12);
+    var val = Math.round(mean + z * sd);
+    return Math.max(0, Math.min(300, val));
+  }
+  function sleep(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+
+  // Runs `worker` over items with limited concurrency, retrying transient
+  // failures (rate limits / unavailable) with backoff instead of hiding them.
+  function runThrottled(items, concurrency, delayMs, worker, onProgress) {
+    var i = 0;
+    var done = 0;
+    var failed = 0;
+    var lastError = null;
+    var total = items.length;
+
+    function attempt(item, triesLeft) {
+      return worker(item).catch(function (err) {
+        var code = err && err.code;
+        var retryable = code === "resource_exhausted" || code === "unavailable" || !code;
+        if (retryable && triesLeft > 0) {
+          var wait = (4 - triesLeft) * 400 + 300;
+          return sleep(wait).then(function () { return attempt(item, triesLeft - 1); });
+        }
+        failed++;
+        lastError = (err && (err.message || err.code)) || String(err);
+        return null;
+      });
+    }
+
+    function next() {
+      if (i >= items.length) return Promise.resolve();
+      var chunk = items.slice(i, i + concurrency);
+      i += concurrency;
+      return Promise.all(chunk.map(function (item) { return attempt(item, 3); })).then(function () {
+        done += chunk.length;
+        onProgress(done, total, failed, lastError);
+        return sleep(delayMs).then(next);
+      });
+    }
+    return next().then(function () { return { total: total, failed: failed, lastError: lastError }; });
+  }
+
+  function setSimProgress(text) {
+    state.simProgressText = text;
+    var el = document.getElementById("simProgress");
+    if (el) el.textContent = text;
+  }
+  function simulateSeason() {
+    if (!db) { setSimProgress("Not connected — open this from Claude to generate demo data."); return; }
+    if (!state.weeks.length || !state.bowlers.length) { setSimProgress("Add teams, bowlers, and at least one week first."); return; }
+    if (!confirm("Generate scores for every bowler in every week that doesn't already have one? This can take a few minutes for a full season — it writes slowly on purpose to stay under the platform's rate limit.")) return;
+
+    var simBtn = document.getElementById("simulateSeasonBtn");
+    var clearBtn = document.getElementById("clearSimulatedBtn");
+    if (simBtn) simBtn.disabled = true;
+    if (clearBtn) clearBtn.disabled = true;
+    state.bulkOperationInProgress = true;
+
+    var gcount = state.settings.gamesPerWeek;
+    var weeksSorted = state.weeks.slice().sort(function (a, b) { return a.number - b.number; });
+    var jobs = [];
+    weeksSorted.forEach(function (w) {
+      state.bowlers.forEach(function (b) {
+        var existing = scoreDocFor(w.id, b.id);
+        var hasReal = existing && (existing.games || []).some(function (g) { return typeof g === "number"; });
+        if (hasReal) return;
+        jobs.push({ weekId: w.id, weekNum: w.number, bowlerId: b.id, bowler: b });
+      });
+    });
+
+    if (!jobs.length) {
+      setSimProgress("Every week already has scores — nothing to fill in.");
+      state.bulkOperationInProgress = false;
+      if (simBtn) simBtn.disabled = false;
+      if (clearBtn) clearBtn.disabled = false;
+      return;
+    }
+
+    var sd = 26;
+    setSimProgress("Generating scores… 0 / " + jobs.length);
+
+    runThrottled(jobs, 4, 250, function (job) {
+      var mean = (typeof job.bowler.enteringAvg === "number") ? job.bowler.enteringAvg : state.settings.handicapBase;
+      var games = [];
+      for (var g = 0; g < gcount; g++) games.push(randNormalish(mean, sd));
+      var docId = job.weekId + "__" + job.bowlerId;
+      return db.collection("scores").doc(docId).set({
+        weekId: job.weekId, bowlerId: job.bowlerId, games: games, updatedAt: Date.now(), simulated: true
+      });
+    }, function (done, total, failed) {
+      setSimProgress("Generating scores… " + done + " / " + total + (failed ? " (" + failed + " failed so far)" : ""));
+    }).then(function (result) {
+      state.bulkOperationInProgress = false;
+      if (simBtn) simBtn.disabled = false;
+      if (clearBtn) clearBtn.disabled = false;
+      if (result.failed) {
+        setSimProgress("Finished with " + result.failed + " of " + result.total + " entries failing. Last error: " + result.lastError + ". Try running it again to fill in the gaps.");
+      } else {
+        setSimProgress("Done — generated " + result.total + " score entries across the season.");
+      }
+      renderAll();
+    });
+  }
+
+  function clearSimulatedScores() {
+    if (!db) { setSimProgress("Not connected — open this from Claude to manage demo data."); return; }
+    var targets = state.scores.filter(function (s) { return s.simulated; });
+    if (!targets.length) { setSimProgress("No simulated scores to clear."); return; }
+    if (!confirm("Delete " + targets.length + " simulated score entries? Anything you entered for real is left alone.")) return;
+
+    var simBtn = document.getElementById("simulateSeasonBtn");
+    var clearBtn = document.getElementById("clearSimulatedBtn");
+    if (simBtn) simBtn.disabled = true;
+    if (clearBtn) clearBtn.disabled = true;
+    state.bulkOperationInProgress = true;
+    setSimProgress("Clearing… 0 / " + targets.length);
+
+    runThrottled(targets, 4, 250, function (s) {
+      return db.collection("scores").doc(s.id).delete();
+    }, function (done, total, failed) {
+      setSimProgress("Clearing… " + done + " / " + total + (failed ? " (" + failed + " failed so far)" : ""));
+    }).then(function (result) {
+      state.bulkOperationInProgress = false;
+      if (simBtn) simBtn.disabled = false;
+      if (clearBtn) clearBtn.disabled = false;
+      if (result.failed) {
+        setSimProgress("Finished with " + result.failed + " of " + result.total + " deletes failing. Last error: " + result.lastError + ". Try again to finish clearing.");
+      } else {
+        setSimProgress("Cleared " + result.total + " simulated score entries.");
+      }
+      renderAll();
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Rendering: SCHEDULE
+  // ---------------------------------------------------------------
+  function weekHasAnyScores(weekId) {
+    return state.scores.some(function (s) {
+      return s.weekId === weekId && (s.games || []).some(function (g) { return typeof g === "number"; });
+    });
+  }
+  function shuffledPairs(teamIds) {
+    var arr = teamIds.slice();
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    var pairs = [];
+    for (var k = 0; k + 1 < arr.length; k += 2) pairs.push({ teamA: arr[k], teamB: arr[k + 1] });
+    return pairs;
+  }
+  function reshuffleWeek(weekId) {
+    if (!db) return;
+    var teamIds = state.teams.map(function (t) { return t.id; });
+    db.collection("weeks").doc(weekId).update({ matchups: shuffledPairs(teamIds) }).catch(function () {});
+  }
+  function reshuffleAllRandomWeeks() {
+    if (!db) return;
+    var teamIds = state.teams.map(function (t) { return t.id; });
+    var targets = state.weeks.filter(function (w) { return w.isRandom && !weekHasAnyScores(w.id); });
+    if (!targets.length) return;
+    if (!confirm("Reshuffle matchups for " + targets.length + " week(s) that don't have scores yet? Weeks with real scheduled matchups or scores already entered are left alone.")) return;
+    targets.forEach(function (w) {
+      db.collection("weeks").doc(w.id).update({ matchups: shuffledPairs(teamIds) }).catch(function () {});
+    });
+  }
+  function generateFullSlate() {
+    if (!db) return;
+    var existingNumbers = {};
+    state.weeks.forEach(function (w) { existingNumbers[w.number] = true; });
+    var teamIds = state.teams.map(function (t) { return t.id; });
+    var missing = [];
+    for (var n = 1; n <= 33; n++) if (!existingNumbers[n]) missing.push(n);
+    if (!missing.length) return;
+    missing.forEach(function (n) {
+      db.collection("weeks").add({ number: n, date: "", matchups: shuffledPairs(teamIds), isRandom: true }).catch(function () {});
+    });
+  }
+
+  function renderSchedule() {
+    var el = document.getElementById("scheduleContent");
+    if (!state.ready) { el.innerHTML = loadingHtml(); return; }
+    if (state.teams.length < 2) {
+      el.innerHTML = '<div class="empty-state"><strong>Add at least two teams</strong>The schedule needs teams to pair up — head to Setup first.</div>';
+      return;
+    }
+    var weeksSorted = state.weeks.slice().sort(function (a, b) { return a.number - b.number; });
+    var maxNum = weeksSorted.reduce(function (m, w) { return Math.max(m, w.number); }, 0);
+    var hasGaps = maxNum < 33 || weeksSorted.length < 33;
+
+    var html = '<div class="schedule-toolbar">';
+    html += '<span style="font-size:13px;color:var(--ink-soft)">' + weeksSorted.length + ' of 33 weeks scheduled</span>';
+    html += '<span style="display:flex;gap:8px;">';
+    if (hasGaps) html += '<button class="btn btn-sm" id="fillSlateBtn">Fill out to 33 weeks</button>';
+    html += '<button class="btn btn-sm btn-quiet" id="reshuffleAllBtn">Reshuffle open weeks</button>';
+    html += '</span></div>';
+
+    if (weeksSorted.length === 0) {
+      html += '<div class="empty-state"><strong>No weeks yet</strong>Start week 1 from Enter Scores, or fill out the full slate above.</div>';
+      el.innerHTML = html;
+      var fillBtnEmpty = document.getElementById("fillSlateBtn");
+      if (fillBtnEmpty) fillBtnEmpty.addEventListener("click", generateFullSlate);
+      return;
+    }
+
+    weeksSorted.forEach(function (w) {
+      var played = weekHasAnyScores(w.id);
+      html += '<div class="schedule-week">';
+      html += '<div class="schedule-week-head"><span class="wk-num">Week ' + w.number + '</span>' +
+        (w.date ? '<span class="wk-date">' + fmtDate(w.date) + '</span>' : '') +
+        (w.isRandom ? '<span class="wk-tag">random</span>' : '<span class="wk-tag" style="color:var(--up);border-color:var(--up)">scheduled</span>') +
+        (played ? '<span class="wk-tag" style="color:var(--ink-soft)">scores in</span>' : '');
+      if (w.isRandom && !played) html += '<button class="btn btn-quiet btn-sm wk-shuffle" data-reshuffle-week="' + w.id + '">Reshuffle</button>';
+      html += '</div>';
+      var matchups = w.matchups || [];
+      if (!matchups.length) {
+        html += '<p style="font-size:13px;color:var(--ink-faint)">No matchups set.</p>';
+      } else {
+        html += '<div class="schedule-chips">';
+        matchups.forEach(function (m) {
+          var ta = byId(state.teams, m.teamA), tb = byId(state.teams, m.teamB);
+          var mp = matchupPoints(w.id, m.teamA, m.teamB);
+          var chipPlayed = mp.aTotals.series > 0 || mp.bTotals.series > 0;
+          var aName = escapeHtml(ta ? ta.name : "?"), bName = escapeHtml(tb ? tb.name : "?");
+          html += '<div class="schedule-chip' + (chipPlayed ? ' played' : '') + '" data-goto-week="' + w.id + '">';
+          if (chipPlayed) {
+            var aWin = mp.a > mp.b, bWin = mp.b > mp.a;
+            html += '<span class="' + (aWin ? 'chip-win' : '') + '">' + aName + '</span><span class="chip-score">' + mp.aTotals.series + '</span>' +
+              '<span class="vs">vs</span>' +
+              '<span class="' + (bWin ? 'chip-win' : '') + '">' + bName + '</span><span class="chip-score">' + mp.bTotals.series + '</span>';
+            if (aWin || bWin) {
+              var winnerName = aWin ? aName : bName;
+              var winPts = Math.max(mp.a, mp.b), losePts = Math.min(mp.a, mp.b);
+              html += '<span class="chip-result">' + winnerName + ' wins ' + winPts + '–' + losePts + '</span>';
+            } else {
+              html += '<span class="chip-tie">tied ' + mp.a + '–' + mp.b + '</span>';
+            }
+          } else {
+            html += aName + '<span class="vs">vs</span>' + bName;
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+
+    el.innerHTML = html;
+
+    var fillBtn = document.getElementById("fillSlateBtn");
+    if (fillBtn) fillBtn.addEventListener("click", generateFullSlate);
+    var reshuffleAllBtn = document.getElementById("reshuffleAllBtn");
+    if (reshuffleAllBtn) reshuffleAllBtn.addEventListener("click", reshuffleAllRandomWeeks);
+    el.querySelectorAll("[data-reshuffle-week]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        reshuffleWeek(btn.getAttribute("data-reshuffle-week"));
+      });
+    });
+    el.querySelectorAll("[data-goto-week]").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        state.activeResultsWeekId = chip.getAttribute("data-goto-week");
+        showTab("results");
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Rendering: RESULTS
+  // ---------------------------------------------------------------
+  function weekBowlerRows(teamId, weekId) {
+    var gcount = state.settings.gamesPerWeek;
+    return teamBowlers(teamId).sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (b) {
+      var doc = scoreDocFor(weekId, b.id);
+      var games = doc ? doc.games.slice() : [];
+      while (games.length < gcount) games.push(null);
+      var valid = games.filter(function (v) { return typeof v === "number"; });
+      var series = valid.length ? valid.reduce(function (a2, v) { return a2 + v; }, 0) : null;
+      var hdcp = bowlerHandicap(b.id, weekId);
+      var hdcpSeries = series !== null ? series + hdcp * gcount : null;
+      return { bowler: b, games: games, series: series, hdcp: hdcp, hdcpSeries: hdcpSeries };
+    });
+  }
+
+  function matchupPoints(weekId, teamAId, teamBId) {
+    var a = teamWeekTotals(teamAId, weekId, true);
+    var b = teamWeekTotals(teamBId, weekId, true);
+    var aPts = 0, bPts = 0;
+    for (var g = 0; g < a.perGame.length; g++) {
+      if (a.perGame[g] > b.perGame[g]) aPts += 1;
+      else if (a.perGame[g] < b.perGame[g]) bPts += 1;
+      else if (a.perGame[g] > 0) { aPts += 0.5; bPts += 0.5; }
+    }
+    if (a.series > b.series) aPts += 1;
+    else if (a.series < b.series) bPts += 1;
+    else if (a.series > 0) { aPts += 0.5; bPts += 0.5; }
+    return { a: aPts, b: bPts, aTotals: a, bTotals: b };
+  }
+
+  function miniRosterTable(teamId, weekId) {
+    var gcount = state.settings.gamesPerWeek;
+    var useH = !state.settings.scratchLeague;
+    var rows = weekBowlerRows(teamId, weekId);
+    var gh = "";
+    for (var g = 0; g < gcount; g++) gh += "<th>G" + (g + 1) + "</th>";
+    var html = '<table class="mini-roster"><thead><tr><th class="name-th">Name</th>' + gh + '<th>Ser</th>' + (useH ? '<th>Hdcp</th>' : '') + '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      html += '<tr><td class="name-td">' + escapeHtml(r.bowler.name) + '</td>';
+      r.games.forEach(function (v) { html += '<td class="num">' + (typeof v === "number" ? v : "–") + '</td>'; });
+      html += '<td class="num series-td">' + (r.series !== null ? r.series : "–") + '</td>';
+      if (useH) html += '<td class="num">' + (r.hdcpSeries !== null ? r.hdcpSeries : "–") + '</td>';
+      html += '</tr>';
+    });
+    if (!rows.length) html += '<tr><td colspan="' + (gcount + (useH ? 3 : 2)) + '" style="text-align:left;color:var(--ink-faint);padding:6px 2px">No bowlers on this team yet.</td></tr>';
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function renderResults() {
+    var el = document.getElementById("resultsContent");
+    if (!state.ready) { el.innerHTML = loadingHtml(); return; }
+    if (state.weeks.length === 0) {
+      el.innerHTML = '<div class="empty-state"><strong>No weeks yet</strong>Start a week from Enter Scores to see results here.</div>';
+      return;
+    }
+    if (!state.activeResultsWeekId || !byId(state.weeks, state.activeResultsWeekId)) {
+      state.activeResultsWeekId = state.weeks[state.weeks.length - 1].id;
+    }
+    var weekOptions = state.weeks.slice().sort(function (a, b) { return a.number - b.number; }).map(function (w) {
+      return '<option value="' + w.id + '"' + (w.id === state.activeResultsWeekId ? " selected" : "") + '>Week ' + w.number + (w.date ? " — " + fmtDate(w.date) : "") + "</option>";
+    }).join("");
+
+    var html = '<div class="week-bar"><select id="resultsWeekSelect">' + weekOptions + '</select></div>';
+    var week = byId(state.weeks, state.activeResultsWeekId);
+    var matchups = week.matchups || [];
+    var useH = !state.settings.scratchLeague;
+    var matchedTeamIds = {};
+
+    if (matchups.length === 0) {
+      html += '<p class="no-week-note">No matchups set for this week yet — add them from Enter Scores if your league plays head-to-head. Individual scores are still shown below.</p>';
+    } else {
+      matchups.forEach(function (m) {
+        matchedTeamIds[m.teamA] = true; matchedTeamIds[m.teamB] = true;
+        var ta = byId(state.teams, m.teamA), tb = byId(state.teams, m.teamB);
+        var mp = matchupPoints(week.id, m.teamA, m.teamB);
+        var gcount = state.settings.gamesPerWeek;
+        var gh = "";
+        for (var g = 0; g < gcount; g++) gh += "<th>G" + (g + 1) + "</th>";
+        html += '<div class="result-card">';
+        html += '<div class="result-head"><div class="vs-line">' + escapeHtml(ta ? ta.name : "?") + '<span class="vs-sep">vs</span>' + escapeHtml(tb ? tb.name : "?") + '</div>' +
+          '<div class="result-points">Points: <b>' + mp.a + '</b> – <b>' + mp.b + '</b></div></div>';
+        html += '<table class="game-compare"><thead><tr><th class="team-label-th"></th>' + gh + '<th>Series</th></tr></thead><tbody>';
+        html += '<tr class="team-row-a"><td class="team-label">' + escapeHtml(ta ? ta.name : "?") + '</td>';
+        for (var gi = 0; gi < gcount; gi++) {
+          var av = mp.aTotals.perGame[gi], bv = mp.bTotals.perGame[gi];
+          html += '<td class="' + (av > bv ? "winner" : "") + '">' + av + '</td>';
+        }
+        html += '<td class="' + (mp.aTotals.series > mp.bTotals.series ? "winner" : "") + '">' + mp.aTotals.series + '</td></tr>';
+        html += '<tr class="team-row-b"><td class="team-label">' + escapeHtml(tb ? tb.name : "?") + '</td>';
+        for (var gi2 = 0; gi2 < gcount; gi2++) {
+          var av2 = mp.aTotals.perGame[gi2], bv2 = mp.bTotals.perGame[gi2];
+          html += '<td class="' + (bv2 > av2 ? "winner" : "") + '">' + bv2 + '</td>';
+        }
+        html += '<td class="' + (mp.bTotals.series > mp.aTotals.series ? "winner" : "") + '">' + mp.bTotals.series + '</td></tr>';
+        html += '</tbody></table>';
+        html += '</div>';
+      });
+    }
+
+    var others = state.teams.filter(function (t) { return !matchedTeamIds[t.id]; });
+    if (others.length && (matchups.length > 0 || state.teams.length > 0)) {
+      if (matchups.length > 0) html += '<h2 class="block-title" style="margin-top:24px">Other teams this week</h2>';
+      var gcountOther = state.settings.gamesPerWeek;
+      others.sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (t) {
+        var totals = teamWeekTotals(t.id, week.id, useH);
+        html += '<div class="result-card"><div class="result-head"><div class="vs-line">' + escapeHtml(t.name) + '</div>' +
+          '<div class="result-points">Series: <b>' + totals.series + '</b></div></div></div>';
+      });
+    }
+
+    el.innerHTML = html;
+    document.getElementById("resultsWeekSelect").addEventListener("change", function (e) {
+      state.activeResultsWeekId = e.target.value;
+      renderResults();
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Rendering: STANDINGS
+  // ---------------------------------------------------------------
+  function renderStandings() {
+    var el = document.getElementById("standingsContent");
+    if (!state.ready) { el.innerHTML = loadingHtml(); return; }
+    if (state.teams.length === 0) {
+      el.innerHTML = '<div class="empty-state"><strong>No teams yet</strong>Add teams in Setup to see standings here.</div>';
+      return;
+    }
+    var useH = !state.settings.scratchLeague;
+    var hasCarryIn = state.teams.some(function (t) { return typeof t.startPoints === "number" || typeof t.startPins === "number"; });
+    var hasMatchups = leagueHasMatchups() || hasCarryIn;
+
+    var rows = state.teams.map(function (t) {
+      return {
+        team: t,
+        pins: teamSeasonTotal(t.id, useH),
+        pinsScratch: teamSeasonTotal(t.id, false),
+        points: teamSeasonPoints(t.id),
+        bowlers: teamBowlers(t.id).length
+      };
+    });
+    rows.sort(function (a, b) { return (b.points - a.points) || (b.pins - a.pins); });
+
+    var html = "";
+    if (hasCarryIn) {
+      html += '<p style="font-size:13px;color:var(--ink-soft);margin:-10px 0 18px 0;">Points include each team\'s carried-in total from before this app — set or adjust it per team in Setup.</p>';
+    }
+    html += '<h2 class="block-title">Points standings</h2>';
+    html += '<table class="standings"><thead><tr><th class="rank">#</th><th>Team</th><th class="num-col">Points</th></tr></thead><tbody>';
+    rows.forEach(function (r, i) {
+      html += '<tr><td class="rank">' + (i + 1) + '</td><td>' + escapeHtml(r.team.name) + '</td><td class="num-col num">' + r.points + '</td></tr>';
+    });
+    html += '</tbody></table>';
+
+    // records
+    var highGame = null, highSeries = null;
+    state.bowlers.forEach(function (b) {
+      var hg = bowlerHighGame(b.id);
+      if (hg !== null && (!highGame || hg > highGame.value)) highGame = { value: hg, name: b.name };
+      var hs = bowlerHighSeries(b.id);
+      if (hs !== null && (!highSeries || hs > highSeries.value)) highSeries = { value: hs, name: b.name };
+    });
+    html += '<h2 class="block-title" style="margin-top:28px">Season records</h2><div class="stat-tiles">';
+    html += tile("High game", highGame ? highGame.value : "–", highGame ? highGame.name : "No games yet");
+    html += tile("High series", highSeries ? highSeries.value : "–", highSeries ? highSeries.name : "No games yet");
+    html += tile("Weeks logged", state.weeks.length, hasCarryIn ? "Plus carried-in weeks" : "");
+    html += '</div>';
+
+    el.innerHTML = html;
+  }
+  function tile(label, value, sub) {
+    return '<div class="tile"><div class="tile-label">' + escapeHtml(label) + '</div><div class="tile-value num">' + escapeHtml(value) + '</div>' +
+      (sub ? '<div class="tile-sub">' + escapeHtml(sub) + '</div>' : '') + '</div>';
+  }
+
+  // ---------------------------------------------------------------
+  // Rendering: BOWLERS
+  // ---------------------------------------------------------------
+  function renderBowlers() {
+    var el = document.getElementById("bowlersContent");
+    if (!state.ready) { el.innerHTML = loadingHtml(); return; }
+    if (state.bowlers.length === 0) {
+      el.innerHTML = '<div class="empty-state"><strong>No bowlers yet</strong>Add bowlers in Setup to start tracking stats.</div>';
+      return;
+    }
+    var useH = !state.settings.scratchLeague;
+    var rows = state.bowlers.map(function (b) {
+      var team = byId(state.teams, b.teamId);
+      return {
+        b: b, team: team,
+        games: bowlerGamesCount(b.id),
+        avg: bowlerAverage(b.id),
+        hdcp: bowlerHandicap(b.id),
+        high: bowlerHighGame(b.id),
+        highSeries: bowlerHighSeries(b.id)
+      };
+    }).sort(function (a, b2) { return b2.avg - a.avg; });
+
+    var colspan = 6 + (useH ? 1 : 0);
+    var html = '<p style="font-size:12.5px;color:var(--ink-faint);margin:-6px 0 10px 0">Tap a bowler to see their week-by-week scores.</p>';
+    html += '<table class="standings"><thead><tr><th class="rank">#</th><th>Bowler</th><th>Team</th><th class="num-col">Games</th><th class="num-col">Avg</th>' +
+      (useH ? '<th class="num-col">Hdcp</th>' : '') + '<th class="num-col">High game</th><th class="num-col">High series</th></tr></thead><tbody>';
+    rows.forEach(function (r, i) {
+      html += '<tr class="bowler-row-clickable" data-bowler-id="' + r.b.id + '"><td class="rank">' + (i + 1) + '</td><td><span class="disclosure-icon">▸</span>' + escapeHtml(r.b.name) + '</td><td style="color:var(--ink-soft)">' + escapeHtml(r.team ? r.team.name : "—") + '</td>' +
+        '<td class="num-col num">' + r.games + '</td><td class="num-col num">' + round1(r.avg) + '</td>' +
+        (useH ? '<td class="num-col num">' + r.hdcp + '</td>' : '') +
+        '<td class="num-col num">' + (r.high !== null ? r.high : "–") + '</td>' +
+        '<td class="num-col num">' + (r.highSeries !== null ? r.highSeries : "–") + '</td></tr>';
+      html += '<tr class="bowler-detail-row" data-detail-for="' + r.b.id + '" style="display:none"><td colspan="' + colspan + '"><div class="bowler-detail-inner"></div></td></tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+
+    el.querySelectorAll(".bowler-row-clickable").forEach(function (row) {
+      row.addEventListener("click", function () {
+        var bowlerId = row.getAttribute("data-bowler-id");
+        var detailRow = el.querySelector('.bowler-detail-row[data-detail-for="' + bowlerId + '"]');
+        var willOpen = detailRow.style.display === "none";
+        el.querySelectorAll(".bowler-detail-row").forEach(function (d) { d.style.display = "none"; });
+        el.querySelectorAll(".bowler-row-clickable").forEach(function (rr) { rr.classList.remove("expanded"); });
+        if (willOpen) {
+          row.classList.add("expanded");
+          detailRow.style.display = "";
+          detailRow.querySelector(".bowler-detail-inner").innerHTML = bowlerDetailHtml(bowlerId);
+        }
+      });
+    });
+  }
+
+  function bowlerDetailHtml(bowlerId) {
+    var useH = !state.settings.scratchLeague;
+    var gcount = state.settings.gamesPerWeek;
+    var weeksSorted = state.weeks.slice().sort(function (a, b) { return a.number - b.number; });
+    var gh = "";
+    for (var g = 0; g < gcount; g++) gh += "<th>G" + (g + 1) + "</th>";
+    var rowsHtml = "";
+    var any = false;
+    weeksSorted.forEach(function (w) {
+      var doc = scoreDocFor(w.id, bowlerId);
+      if (!doc) return;
+      var valid = (doc.games || []).filter(function (v) { return typeof v === "number"; });
+      if (!valid.length) return;
+      any = true;
+      var series = valid.reduce(function (a, v) { return a + v; }, 0);
+      var hdcp = bowlerHandicap(bowlerId, null);
+      rowsHtml += '<tr><td class="week-td">Week ' + w.number + (w.date ? " · " + fmtDate(w.date) : "") + '</td>';
+      var games = doc.games.slice();
+      while (games.length < gcount) games.push(null);
+      games.forEach(function (v) { rowsHtml += '<td class="num">' + (typeof v === "number" ? v : "–") + '</td>'; });
+      rowsHtml += '<td class="num" style="font-weight:600">' + series + '</td>';
+      if (useH) rowsHtml += '<td class="num">' + (series + hdcp * gcount) + '</td>';
+      rowsHtml += '</tr>';
+    });
+    if (!any) return '<p style="font-size:13px;color:var(--ink-faint);padding:8px 4px">No games logged yet for this bowler.</p>';
+    return '<table class="week-log"><thead><tr><th class="week-th">Week</th>' + gh + '<th>Series</th>' + (useH ? '<th>Hdcp series</th>' : '') + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+  }
+
+  // ---------------------------------------------------------------
+  // Rendering: SETUP
+  // ---------------------------------------------------------------
+  function renderSetup() {
+    var el = document.getElementById("setupContent");
+    if (!state.ready) { el.innerHTML = loadingHtml(); return; }
+
+    var s = state.settings;
+    var html = '<section class="block"><h2 class="block-title">Demo data</h2>';
+    html += '<p style="font-size:13px;color:var(--ink-soft);margin:0 0 10px 0">Fill every week with realistic scores (built around each bowler\'s real average) so you can see standings, results, and stats working with a full season in place. Only fills weeks/bowlers that don\'t already have a score — it won\'t touch anything you\'ve entered for real.</p>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+      '<button class="btn btn-primary btn-sm" id="simulateSeasonBtn"' + (state.bulkOperationInProgress ? " disabled" : "") + '>Simulate full season</button>' +
+      '<button class="btn btn-quiet btn-sm" id="clearSimulatedBtn"' + (state.bulkOperationInProgress ? " disabled" : "") + '>Clear simulated scores</button>' +
+      '</div><p id="simProgress" style="font-size:12.5px;color:var(--ink-faint);margin-top:8px">' + escapeHtml(state.simProgressText) + '</p></section>';
+
+    html += '<section class="block"><h2 class="block-title">League format</h2>';
+    html += '<div class="field-row">';
+    html += '<div class="field"><label>Games per week</label><input type="number" id="gamesPerWeek" min="1" max="6" value="' + s.gamesPerWeek + '" style="width:80px"></div>';
+    html += '<div class="field"><label>Scoring</label><select id="scratchToggle"><option value="handicap"' + (!s.scratchLeague ? ' selected' : '') + '>Handicap</option><option value="scratch"' + (s.scratchLeague ? ' selected' : '') + '>Scratch</option></select></div>';
+    if (!s.scratchLeague) {
+      html += '<div class="field"><label>Handicap base</label><input type="number" id="hdcpBase" value="' + s.handicapBase + '" style="width:90px"></div>';
+      html += '<div class="field"><label>Handicap %</label><input type="number" id="hdcpPct" min="0" max="100" value="' + Math.round(s.handicapPercent * 100) + '" style="width:80px"></div>';
+    }
+    html += '</div><button class="btn btn-sm" id="saveFormatBtn">Save format</button></section>';
+
+    html += '<section class="block"><h2 class="block-title">Teams &amp; bowlers</h2>';
+    html += '<div class="field-row"><div class="field" style="flex:1;min-width:160px"><label>New team name</label><input type="text" id="newTeamName" placeholder="e.g. Alley Cats"></div><button class="btn btn-primary btn-sm" id="addTeamBtn">Add team</button></div>';
+
+    if (state.teams.length === 0) {
+      html += '<div class="empty-state"><strong>Add your first team</strong>Then add bowlers to it below.</div>';
+    } else {
+      state.teams.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (t) {
+        var bowlers = teamBowlers(t.id).sort(function (a, b) { return a.name.localeCompare(b.name); });
+        html += '<div class="team-card" data-team="' + t.id + '">';
+        html += '<div class="team-card-head"><h3><span class="team-swatch"></span>' + escapeHtml(t.name) + '</h3><button class="icon-btn" data-del-team="' + t.id + '" title="Delete team">✕</button></div>';
+        html += '<div class="carry-in-row">' +
+          '<div class="field"><label>Carry-in points</label><input type="number" step="0.5" class="carry-points-input" data-team-carry="' + t.id + '" value="' + (typeof t.startPoints === "number" ? t.startPoints : "") + '"></div>' +
+          '<div class="field"><label>Carry-in pins (hdcp)</label><input type="number" class="carry-pins-input" data-team-carry="' + t.id + '" value="' + (typeof t.startPins === "number" ? t.startPins : "") + '"></div>' +
+          '</div>';
+        bowlers.forEach(function (b) {
+          html += '<div class="bowler-row"><span>' + escapeHtml(b.name) + '</span><span class="bowler-meta">' +
+            (typeof b.enteringAvg === "number" ? "entering avg " + b.enteringAvg : "no entering avg") +
+            '<button class="icon-btn" data-del-bowler="' + b.id + '" title="Remove bowler">✕</button></span></div>';
+        });
+        html += '<div class="field-row" style="margin-top:10px;margin-bottom:0">' +
+          '<div class="field"><input type="text" placeholder="Bowler name" class="new-bowler-name" style="width:140px"></div>' +
+          '<div class="field"><input type="number" placeholder="Entering avg" class="new-bowler-avg" style="width:100px"></div>' +
+          '<button class="btn btn-sm add-bowler-btn" data-team="' + t.id + '">Add bowler</button></div>';
+        html += '</div>';
+      });
+    }
+    html += '</section>';
+
+    el.innerHTML = html;
+
+    var simBtn = document.getElementById("simulateSeasonBtn");
+    if (simBtn) simBtn.addEventListener("click", function () { simulateSeason(); });
+    var clearSimBtn = document.getElementById("clearSimulatedBtn");
+    if (clearSimBtn) clearSimBtn.addEventListener("click", function () { clearSimulatedScores(); });
+
+    var saveFmt = document.getElementById("saveFormatBtn");
+    if (saveFmt) saveFmt.addEventListener("click", function () {
+      var gpw = parseInt(document.getElementById("gamesPerWeek").value, 10) || 3;
+      var scratch = document.getElementById("scratchToggle").value === "scratch";
+      var base = s.handicapBase, pct = s.handicapPercent;
+      var baseInp = document.getElementById("hdcpBase");
+      var pctInp = document.getElementById("hdcpPct");
+      if (baseInp) base = parseInt(baseInp.value, 10) || s.handicapBase;
+      if (pctInp) pct = (parseInt(pctInp.value, 10) || Math.round(s.handicapPercent * 100)) / 100;
+      state.settings = { leagueName: s.leagueName, gamesPerWeek: gpw, scratchLeague: scratch, handicapBase: base, handicapPercent: pct };
+      saveSettings();
+      renderSetup();
+    });
+
+    var addTeamBtn = document.getElementById("addTeamBtn");
+    if (addTeamBtn) addTeamBtn.addEventListener("click", function () {
+      var input = document.getElementById("newTeamName");
+      var name = input.value.trim();
+      if (!name) return;
+      var id = uid();
+      if (!db) { state.teams.push({ id: id, name: name }); renderSetup(); return; }
+      db.collection("teams").doc(id).set({ name: name }).catch(function () {});
+      input.value = "";
+    });
+
+    el.querySelectorAll(".carry-points-input, .carry-pins-input").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        var teamId = inp.getAttribute("data-team-carry");
+        var v = inp.value.trim();
+        var num = v === "" ? null : parseFloat(v);
+        var field = inp.classList.contains("carry-points-input") ? "startPoints" : "startPins";
+        if (!db) return;
+        var patch = {};
+        if (num === null) {
+          // clear the field by rewriting the whole doc's known shape
+          var t = byId(state.teams, teamId);
+          var next = Object.assign({}, t);
+          delete next.id;
+          delete next[field];
+          db.collection("teams").doc(teamId).set(next).catch(function () {});
+        } else {
+          patch[field] = num;
+          db.collection("teams").doc(teamId).update(patch).catch(function () {});
+        }
+      });
+    });
+
+    el.querySelectorAll("[data-del-team]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var teamId = btn.getAttribute("data-del-team");
+        var count = teamBowlers(teamId).length;
+        if (!confirm(count ? "Delete this team and its " + count + " bowler(s)?" : "Delete this team?")) return;
+        if (!db) return;
+        db.collection("teams").doc(teamId).delete().catch(function () {});
+        teamBowlers(teamId).forEach(function (b) { db.collection("bowlers").doc(b.id).delete().catch(function () {}); });
+      });
+    });
+    el.querySelectorAll("[data-del-bowler]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var bowlerId = btn.getAttribute("data-del-bowler");
+        if (!confirm("Remove this bowler? Their past scores stay in the records.")) return;
+        if (!db) return;
+        db.collection("bowlers").doc(bowlerId).delete().catch(function () {});
+      });
+    });
+    el.querySelectorAll(".add-bowler-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var card = btn.closest(".team-card");
+        var nameInp = card.querySelector(".new-bowler-name");
+        var avgInp = card.querySelector(".new-bowler-avg");
+        var name = nameInp.value.trim();
+        if (!name) return;
+        var teamId = btn.getAttribute("data-team");
+        var avg = avgInp.value.trim() === "" ? null : parseFloat(avgInp.value);
+        var payload = { name: name, teamId: teamId };
+        if (avg !== null && !isNaN(avg)) payload.enteringAvg = avg;
+        var id = uid();
+        if (!db) { state.bowlers.push(Object.assign({ id: id }, payload)); renderSetup(); return; }
+        db.collection("bowlers").doc(id).set(payload).catch(function () {});
+      });
+    });
+  }
+
+  function loadingHtml() {
+    return '<div class="empty-state">Loading league data…</div>';
+  }
+
+  // ---------------------------------------------------------------
+  // Connect to db capability
+  // ---------------------------------------------------------------
+  function init() {
+    if (!window.claude || !window.claude.use) {
+      state.ready = true;
+      setStatus("Not connected — open this from Claude to save changes.");
+      renderAll();
+      return;
+    }
+    window.claude.use("db").then(function (d) {
+      if (!d) {
+        state.ready = true;
+        setStatus("Storage unavailable in this view — changes won't be saved.");
+        renderAll();
+        return;
+      }
+      db = d;
+      state.connected = true;
+      subscribeAll();
+    }).catch(function () {
+      state.ready = true;
+      setStatus("Storage unavailable in this view — changes won't be saved.");
+      renderAll();
+    });
+
+    window.claude.use("downloads").then(function (d) { dlAPI = d; }).catch(function () {});
+  }
+
+  function subscribeAll() {
+    var loadedFlags = { settings: false, teams: false, bowlers: false, weeks: false, scores: false };
+    function checkReady() {
+      if (Object.keys(loadedFlags).every(function (k) { return loadedFlags[k]; })) {
+        state.ready = true;
+        if (!leagueNameInput.matches(":focus")) leagueNameInput.value = state.settings.leagueName;
+        document.title = state.settings.leagueName;
+        renderAll();
+      }
+    }
+
+    unsubs.push(db.doc("settings/league").onSnapshot(function (snap) {
+      if (snap.exists) {
+        var d = snap.data();
+        state.settings = {
+          leagueName: d.leagueName || "League Night",
+          gamesPerWeek: d.gamesPerWeek || 3,
+          handicapBase: typeof d.handicapBase === "number" ? d.handicapBase : 220,
+          handicapPercent: typeof d.handicapPercent === "number" ? d.handicapPercent : 0.9,
+          scratchLeague: !!d.scratchLeague
+        };
+      }
+      loadedFlags.settings = true;
+      if (state.ready) { if (!leagueNameInput.matches(":focus")) leagueNameInput.value = state.settings.leagueName; document.title = state.settings.leagueName; renderAll(); }
+      checkReady();
+    }, function () { loadedFlags.settings = true; checkReady(); }));
+
+    unsubs.push(db.collection("teams").onSnapshot(function (snap) {
+      state.teams = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      loadedFlags.teams = true;
+      if (state.ready) renderAll();
+      checkReady();
+    }, function () { loadedFlags.teams = true; checkReady(); }));
+
+    unsubs.push(db.collection("bowlers").onSnapshot(function (snap) {
+      state.bowlers = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      loadedFlags.bowlers = true;
+      if (state.ready) renderAll();
+      checkReady();
+    }, function () { loadedFlags.bowlers = true; checkReady(); }));
+
+    unsubs.push(db.collection("weeks").onSnapshot(function (snap) {
+      state.weeks = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      loadedFlags.weeks = true;
+      if (state.ready) renderAll();
+      checkReady();
+    }, function () { loadedFlags.weeks = true; checkReady(); }));
+
+    unsubs.push(db.collection("scores").onSnapshot(function (snap) {
+      state.scores = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      loadedFlags.scores = true;
+      if (state.ready && !state.bulkOperationInProgress) {
+        // avoid clobbering an in-progress entry row's focused input on every remote update
+        var activeEl = document.activeElement;
+        var isTypingScore = activeEl && activeEl.classList && activeEl.classList.contains("score-input");
+        if (!isTypingScore || currentTabName() !== "entry") renderAll();
+      }
+      checkReady();
+    }, function () { loadedFlags.scores = true; checkReady(); }));
+  }
+
+  // Restore tab from hash
+  (function () {
+    var h = (location.hash || "").replace("#", "");
+    if (["entry", "schedule", "results", "standings", "bowlers", "setup"].indexOf(h) !== -1) {
+      document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.toggle("active", b.getAttribute("data-tab") === h); });
+      document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
+      document.getElementById("view-" + h).classList.add("active");
+    }
+  })();
+
+  init();
+})();
+</script>
+</body>
+</html>
