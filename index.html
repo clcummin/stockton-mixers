@@ -446,7 +446,8 @@
     scores: [],       // {id, weekId, bowlerId, games:[n,n,n]}
     activeWeekId: null,
     bulkOperationInProgress: false,
-    simProgressText: ""
+    simProgressText: "",
+    expandedBowlerId: null
   };
 
   var db = null;
@@ -1410,11 +1411,24 @@
     html += '</tbody></table>';
     el.innerHTML = html;
 
+    if (state.expandedBowlerId) {
+      var savedRow = el.querySelector('.bowler-row-clickable[data-bowler-id="' + state.expandedBowlerId + '"]');
+      var savedDetail = el.querySelector('.bowler-detail-row[data-detail-for="' + state.expandedBowlerId + '"]');
+      if (savedRow && savedDetail) {
+        savedRow.classList.add("expanded");
+        savedDetail.style.display = "";
+        savedDetail.querySelector(".bowler-detail-inner").innerHTML = bowlerDetailHtml(state.expandedBowlerId);
+      } else {
+        state.expandedBowlerId = null;
+      }
+    }
+
     el.querySelectorAll(".bowler-row-clickable").forEach(function (row) {
       row.addEventListener("click", function () {
         var bowlerId = row.getAttribute("data-bowler-id");
         var detailRow = el.querySelector('.bowler-detail-row[data-detail-for="' + bowlerId + '"]');
-        var willOpen = detailRow.style.display === "none";
+        var willOpen = state.expandedBowlerId !== bowlerId;
+        state.expandedBowlerId = willOpen ? bowlerId : null;
         el.querySelectorAll(".bowler-detail-row").forEach(function (d) { d.style.display = "none"; });
         el.querySelectorAll(".bowler-row-clickable").forEach(function (rr) { rr.classList.remove("expanded"); });
         if (willOpen) {
