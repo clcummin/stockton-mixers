@@ -1604,30 +1604,76 @@
   // ---------------------------------------------------------------
   // Connect to db capability
   // ---------------------------------------------------------------
+  // ---------------------------------------------------------------
+  // Backend: Google Apps Script web app (see Code.gs)
+  // Paste the /exec URL from your Apps Script deployment here.
+  // ---------------------------------------------------------------
+  var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwjEsfb6LVcTm4owqBbgZzM562voEz7fNgVlA9mrMiMnzaZNkrM8z5TPbEnX99Wn-A/exec";
+  var POLL_MS = 4000;
+
+  function makeSheetDb(apiUrl) {
+    function call(params, body) {
+      if (body === undefined) {
+        return fetch(apiUrl + "?" + new URLSearchParams(params)).then(function (r) { return r.json(); });
+      }
+      return fetch(apiUrl, { method: "POST", body: JSON.stringify(Object.assign({}, params, { data: body })) })
+        .then(function (r) { return r.json(); });
+    }
+    function docRef(collectionName, id) {
+      return {
+        get: function () {
+          return call({ action: "get", collection: collectionName, id: id }).then(function (res) {
+            var d = res.doc;
+            return { exists: !!d, data: function () { return d || {}; } };
+          });
+        },
+        set: function (data) { return call({ action: "set", collection: collectionName, id: id }, data); },
+        update: function (data) { return call({ action: "update", collection: collectionName, id: id }, data); },
+        delete: function () { return call({ action: "delete", collection: collectionName, id: id }); }
+      };
+    }
+    function collectionRef(collectionName) {
+      return {
+        doc: function (id) { return docRef(collectionName, id); },
+        add: function (data) { return call({ action: "add", collection: collectionName }, data); },
+        onSnapshot: function (cb, errCb) {
+          var stopped = false;
+          function poll() {
+            if (stopped) return;
+            call({ action: "list", collection: collectionName }).then(function (res) {
+              if (stopped) return;
+              if (res.error) { if (errCb) errCb(res.error); return; }
+              var docs = (res.docs || []).map(function (r) {
+                return { id: r.id, exists: true, data: function () { return r; } };
+              });
+              cb({ docs: docs });
+            }).catch(function (e) { if (errCb) errCb(e); });
+          }
+          poll();
+          var handle = setInterval(poll, POLL_MS);
+          return function unsubscribe() { stopped = true; clearInterval(handle); };
+        }
+      };
+    }
+    return {
+      collection: collectionRef,
+      doc: function (path) {
+        var parts = path.split("/");
+        return collectionRef(parts[0]).doc(parts[1]);
+      }
+    };
+  }
+
   function init() {
-    if (!window.claude || !window.claude.use) {
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf("PASTE_YOUR") === 0) {
       state.ready = true;
-      setStatus("Not connected — open this from Claude to save changes.");
+      setStatus("Not connected — paste your Apps Script Web app URL into APPS_SCRIPT_URL near the top of this file.");
       renderAll();
       return;
     }
-    window.claude.use("db").then(function (d) {
-      if (!d) {
-        state.ready = true;
-        setStatus("Storage unavailable in this view — changes won't be saved.");
-        renderAll();
-        return;
-      }
-      db = d;
-      state.connected = true;
-      subscribeAll();
-    }).catch(function () {
-      state.ready = true;
-      setStatus("Storage unavailable in this view — changes won't be saved.");
-      renderAll();
-    });
-
-    window.claude.use("downloads").then(function (d) { dlAPI = d; }).catch(function () {});
+    db = makeSheetDb(APPS_SCRIPT_URL);
+    state.connected = true;
+    subscribeAll();
   }
 
   function subscribeAll() {
