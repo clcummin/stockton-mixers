@@ -1714,35 +1714,50 @@
         };
       }
       loadedFlags.settings = true;
-      if (state.ready) { if (!leagueNameInput.matches(":focus")) leagueNameInput.value = state.settings.leagueName; document.title = state.settings.leagueName; renderAll(); }
+      var settingsSignature = JSON.stringify(state.settings);
+      if (state.ready && settingsSignature !== subscribeAll._lastSettingsSignature) {
+        subscribeAll._lastSettingsSignature = settingsSignature;
+        if (!leagueNameInput.matches(":focus")) leagueNameInput.value = state.settings.leagueName;
+        document.title = state.settings.leagueName;
+        renderAll();
+      }
+      if (!subscribeAll._lastSettingsSignature) subscribeAll._lastSettingsSignature = settingsSignature;
       checkReady();
     }, function () { loadedFlags.settings = true; checkReady(); }));
 
     unsubs.push(db.collection("teams").onSnapshot(function (snap) {
-      state.teams = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      var nextTeams = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      var teamsChanged = JSON.stringify(state.teams) !== JSON.stringify(nextTeams);
+      state.teams = nextTeams;
       loadedFlags.teams = true;
-      if (state.ready) renderAll();
+      if (state.ready && teamsChanged) renderAll();
       checkReady();
     }, function () { loadedFlags.teams = true; checkReady(); }));
 
     unsubs.push(db.collection("bowlers").onSnapshot(function (snap) {
-      state.bowlers = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      var nextBowlers = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      var bowlersChanged = JSON.stringify(state.bowlers) !== JSON.stringify(nextBowlers);
+      state.bowlers = nextBowlers;
       loadedFlags.bowlers = true;
-      if (state.ready) renderAll();
+      if (state.ready && bowlersChanged) renderAll();
       checkReady();
     }, function () { loadedFlags.bowlers = true; checkReady(); }));
 
     unsubs.push(db.collection("weeks").onSnapshot(function (snap) {
-      state.weeks = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      var nextWeeks = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      var weeksChanged = JSON.stringify(state.weeks) !== JSON.stringify(nextWeeks);
+      state.weeks = nextWeeks;
       loadedFlags.weeks = true;
-      if (state.ready) renderAll();
+      if (state.ready && weeksChanged) renderAll();
       checkReady();
     }, function () { loadedFlags.weeks = true; checkReady(); }));
 
     unsubs.push(db.collection("scores").onSnapshot(function (snap) {
-      state.scores = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      var nextScores = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      var scoresChanged = JSON.stringify(state.scores) !== JSON.stringify(nextScores);
+      state.scores = nextScores;
       loadedFlags.scores = true;
-      if (state.ready && !state.bulkOperationInProgress) {
+      if (state.ready && scoresChanged && !state.bulkOperationInProgress) {
         // avoid clobbering an in-progress entry row's focused input on every remote update
         var activeEl = document.activeElement;
         var isTypingScore = activeEl && activeEl.classList && activeEl.classList.contains("score-input");
