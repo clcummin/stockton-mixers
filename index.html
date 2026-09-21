@@ -126,6 +126,15 @@
   nav.tabs button.active { color: var(--ink); border-bottom-color: var(--amber); }
   nav.tabs button:hover:not(.active) { color: var(--ink); }
   nav.tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .dashboard-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:14px; }
+  .dash-card { grid-column:span 6; background:var(--panel); border:1px solid var(--panel-edge); border-radius:var(--radius-md); padding:16px; }
+  .dash-card.wide { grid-column:span 12; }
+  .dash-card h2 { margin:0 0 12px; font-size:13px; color:var(--ink-soft); }
+  .dash-list { display:flex; flex-direction:column; gap:9px; }
+  .dash-row { display:flex; justify-content:space-between; gap:12px; align-items:center; font-size:14px; }
+  .dash-rank { color:var(--ink-faint); width:24px; display:inline-block; }
+  .dash-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  @media (max-width:700px) { .dash-card { grid-column:span 12; } }
 
   /* ---------- Layout ---------- */
   main { max-width: 980px; margin: 0 auto; padding: 22px 18px 80px 18px; }
@@ -370,7 +379,8 @@
     </div>
   </div>
   <nav class="tabs" id="tabs">
-    <button data-tab="entry" class="active">Enter scores</button>
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="entry">Enter scores</button>
     <button data-tab="schedule">Schedule</button>
     <button data-tab="results">Results</button>
     <button data-tab="standings">Standings</button>
@@ -382,9 +392,14 @@
 <div class="status-bar" id="statusBar"></div>
 
 <main>
+  <section class="view active" id="view-dashboard">
+    <h1 class="page-title">League dashboard</h1>
+    <p class="page-sub">A quick look at the season, current week, standings, and league leaders.</p>
+    <div id="dashboardContent"></div>
+  </section>
 
   <!-- ENTRY -->
-  <section class="view active" id="view-entry">
+  <section class="view" id="view-entry">
     <h1 class="page-title">Enter scores</h1>
     <p class="page-sub">Pick a week, then tab through the grid. Games save automatically as you go — you can also paste three scores at once into the first box of a row.</p>
     <div id="entryContent"></div>
@@ -620,11 +635,12 @@
 
   function currentTabName() {
     var active = document.querySelector("#tabs button.active");
-    return active ? active.getAttribute("data-tab") : "entry";
+    return active ? active.getAttribute("data-tab") : "dashboard";
   }
   function renderActiveTab(name) {
     name = name || currentTabName();
-    if (name === "entry") renderEntry();
+    if (name === "dashboard") renderDashboard();
+    else if (name === "entry") renderEntry();
     else if (name === "schedule") renderSchedule();
     else if (name === "results") renderResults();
     else if (name === "standings") renderStandings();
@@ -666,6 +682,47 @@
   function saveSettings() {
     if (!db) return;
     db.doc("settings/league").set(state.settings).catch(function () {});
+  }
+
+  // ---------------------------------------------------------------
+  // Rendering: DASHBOARD
+  // ---------------------------------------------------------------
+  function renderDashboard() {
+    var el = document.getElementById("dashboardContent");
+    if (!state.ready) { el.innerHTML = loadingHtml(); return; }
+    var weeks = state.weeks.slice().sort(function(a,b){ return a.number-b.number; });
+    var current = weeks.length ? weeks[weeks.length-1] : null;
+    var standings = state.teams.map(function(t){ return { team:t, points:teamSeasonPoints(t.id), pins:teamSeasonTotal(t.id,!state.settings.scratchLeague) }; })
+      .sort(function(a,b){ return (b.points-a.points)||(b.pins-a.pins); });
+    var bowlers = state.bowlers.map(function(b){ return { b:b, avg:bowlerAverage(b.id), games:bowlerGamesCount(b.id), high:bowlerHighGame(b.id), series:bowlerHighSeries(b.id) }; });
+    var avgLeaders = bowlers.filter(function(r){return r.games>0;}).sort(function(a,b){return b.avg-a.avg;}).slice(0,5);
+    var highGame = bowlers.filter(function(r){return r.high!==null;}).sort(function(a,b){return b.high-a.high;})[0];
+    var highSeries = bowlers.filter(function(r){return r.series!==null;}).sort(function(a,b){return b.series-a.series;})[0];
+
+    var html = '<div class="dash-actions"><button class="btn btn-primary" data-dash-tab="entry">Enter scores</button><button class="btn" data-dash-tab="standings">Full standings</button><button class="btn" data-dash-tab="bowlers">Bowler stats</button></div>';
+    html += '<div class="stat-tiles">' +
+      tile("Current week", current ? "Week " + current.number : "–", current && current.date ? fmtDate(current.date) : "No week started") +
+      tile("Teams", state.teams.length, state.bowlers.length + " bowlers") +
+      tile("High game", highGame ? highGame.high : "–", highGame ? highGame.b.name : "No games yet") +
+      tile("High series", highSeries ? highSeries.series : "–", highSeries ? highSeries.b.name : "No games yet") +
+      '</div><div class="dashboard-grid">';
+
+    html += '<section class="dash-card"><h2>Standings</h2><div class="dash-list">';
+    if (!standings.length) html += '<span style="color:var(--ink-faint)">No teams yet.</span>';
+    standings.slice(0,5).forEach(function(r,i){ html += '<div class="dash-row"><span><span class="dash-rank">'+(i+1)+'</span>'+escapeHtml(r.team.name)+'</span><strong class="num">'+r.points+' pts</strong></div>'; });
+    html += '</div></section>';
+
+    html += '<section class="dash-card"><h2>Average leaders</h2><div class="dash-list">';
+    if (!avgLeaders.length) html += '<span style="color:var(--ink-faint)">No scores yet.</span>';
+    avgLeaders.forEach(function(r,i){ html += '<div class="dash-row"><span><span class="dash-rank">'+(i+1)+'</span>'+escapeHtml(r.b.name)+'</span><strong class="num">'+round1(r.avg)+'</strong></div>'; });
+    html += '</div></section>';
+
+    html += '<section class="dash-card wide"><h2>' + (current ? 'Week '+current.number+' matchups' : 'Current week') + '</h2><div class="dash-list">';
+    if (!current || !(current.matchups||[]).length) html += '<span style="color:var(--ink-faint)">No matchups scheduled yet.</span>';
+    else (current.matchups||[]).forEach(function(m){ var a=byId(state.teams,m.teamA), b=byId(state.teams,m.teamB); html += '<div class="dash-row"><span>'+escapeHtml(a?a.name:"TBD")+' <span style="color:var(--ink-faint)">vs</span> '+escapeHtml(b?b.name:"TBD")+'</span></div>'; });
+    html += '</div></section></div>';
+    el.innerHTML = html;
+    el.querySelectorAll("[data-dash-tab]").forEach(function(btn){ btn.addEventListener("click",function(){ showTab(btn.getAttribute("data-dash-tab")); }); });
   }
 
   // ---------------------------------------------------------------
@@ -1784,7 +1841,7 @@
   // Restore tab from hash
   (function () {
     var h = (location.hash || "").replace("#", "");
-    if (["entry", "schedule", "results", "standings", "bowlers", "setup"].indexOf(h) !== -1) {
+    if (["dashboard", "entry", "schedule", "results", "standings", "bowlers", "setup"].indexOf(h) !== -1) {
       document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.toggle("active", b.getAttribute("data-tab") === h); });
       document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
       document.getElementById("view-" + h).classList.add("active");
