@@ -420,6 +420,17 @@
     .brand-name { font-size:18px; max-width:62vw; }
   }
 
+
+  .entry-focus { background:var(--panel); border:1px solid var(--panel-edge); border-radius:var(--radius-md); padding:14px; margin-bottom:16px; }
+  .entry-focus-row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+  .entry-focus-row .field { flex:1; min-width:190px; }
+  .entry-focus-row select { width:100%; }
+  .entry-focus-hint { font-size:12px; color:var(--ink-soft); margin:8px 0 0; }
+  .photo-import { border:1px dashed var(--panel-edge); border-radius:var(--radius-md); padding:14px; margin:0 0 16px; background:var(--panel); }
+  .photo-import-title { font-weight:650; font-size:14px; margin-bottom:3px; }
+  .photo-import p { color:var(--ink-soft); font-size:12px; margin:0 0 10px; }
+  .photo-preview { max-width:100%; max-height:220px; border-radius:var(--radius-sm); display:block; margin-top:10px; }
+
 </style>
 </head>
 <body>
@@ -457,7 +468,7 @@
   <!-- ENTRY -->
   <section class="view" id="view-entry">
     <h1 class="page-title">Enter scores</h1>
-    <p class="page-sub">Pick a week, then tab through the grid. Games save automatically as you go — you can also paste three scores at once into the first box of a row.</p>
+    <p class="page-sub">Choose your team to focus on just your matchup. Scores save automatically as you enter them.</p>
     <div id="entryContent"></div>
   </section>
 
@@ -521,7 +532,8 @@
     expandedBowlerId: null,
     expandedTeamId: null,
     pendingScoreSaves: 0,
-    lastSyncError: null
+    lastSyncError: null,
+    entryTeamId: localStorage.getItem("leagueEntryTeamId") || null
   };
 
   var db = null;
@@ -862,6 +874,13 @@
 
     var teamsSorted = state.teams.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
 
+    if (state.entryTeamId && !byId(state.teams,state.entryTeamId)) state.entryTeamId=null;
+    var teamChooser = '<div class="entry-focus"><div class="entry-focus-row"><div class="field"><label>My team</label><select id="entryTeamSelect"><option value="">Show all teams</option>' +
+      teamsSorted.map(function(t){ return '<option value="'+t.id+'"'+(t.id===state.entryTeamId?' selected':'')+'>'+escapeHtml(t.name)+'</option>'; }).join("") +
+      '</select></div></div><p class="entry-focus-hint">Choose your team once and this device will remember it. Only that week\'s matchup will be shown.</p></div>';
+    html += teamChooser;
+    html += '<div class="photo-import"><div class="photo-import-title">Scoreboard photo</div><p>Take or choose a photo now. The prototype keeps it on this device for review; automatic score extraction is the next step and will always require confirmation before saving.</p><label class="btn" for="scorePhotoInput">Choose photo</label><input id="scorePhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><div id="scorePhotoPreview"></div></div>';
+
     function buildTeamRows(team) {
       var bowlers = teamBowlers(team.id).sort(function (a, b) { return a.name.localeCompare(b.name); });
       if (!bowlers.length) return "";
@@ -897,10 +916,11 @@
     }
 
     var matchups = week.matchups || [];
+    var focusedMatchups = state.entryTeamId ? matchups.filter(function(m){ return m.teamA===state.entryTeamId || m.teamB===state.entryTeamId; }) : matchups;
     var matchedIds = {};
     var sectionsHtml = "";
 
-    matchups.forEach(function (m) {
+    focusedMatchups.forEach(function (m) {
       matchedIds[m.teamA] = true; matchedIds[m.teamB] = true;
       var ta = byId(state.teams, m.teamA), tb = byId(state.teams, m.teamB);
       var mh=matchupHandicap(week.id,m.teamA,m.teamB);
@@ -910,12 +930,16 @@
       sectionsHtml += '</div>';
     });
 
-    var others = teamsSorted.filter(function (t) { return !matchedIds[t.id]; });
+    var others = state.entryTeamId ? [] : teamsSorted.filter(function (t) { return !matchedIds[t.id]; });
     if (others.length) {
       if (matchups.length) sectionsHtml += '<h2 class="block-title" style="margin-top:26px">Other teams this week</h2>';
       sectionsHtml += gridTable(others.map(buildTeamRows).join(""));
     }
 
+    if (state.entryTeamId && !focusedMatchups.length) {
+      var ft=byId(state.teams,state.entryTeamId);
+      sectionsHtml = '<div class="empty-state"><strong>No matchup for '+escapeHtml(ft?ft.name:"this team")+'</strong>This team is not paired in Week '+week.number+'. Choose another team or set the matchup below.</div>';
+    }
     html += sectionsHtml;
 
     // matchups
@@ -945,6 +969,21 @@
     });
     document.getElementById("newWeekBtn").addEventListener("click", function () { createWeek(); });
     document.getElementById("deleteWeekBtn").addEventListener("click", function () { deleteWeek(week.id); });
+
+    var teamSelect=document.getElementById("entryTeamSelect");
+    if(teamSelect) teamSelect.addEventListener("change",function(){
+      state.entryTeamId=teamSelect.value || null;
+      if(state.entryTeamId) localStorage.setItem("leagueEntryTeamId",state.entryTeamId); else localStorage.removeItem("leagueEntryTeamId");
+      renderEntry();
+    });
+    var photoInput=document.getElementById("scorePhotoInput");
+    if(photoInput) photoInput.addEventListener("change",function(){
+      var file=photoInput.files && photoInput.files[0], preview=document.getElementById("scorePhotoPreview");
+      if(!file || !preview) return;
+      var url=URL.createObjectURL(file);
+      preview.innerHTML='<img class="photo-preview" alt="Scoreboard photo preview"><p style="margin-top:8px">Photo ready for review. No scores have been changed.</p>';
+      preview.querySelector("img").src=url;
+    });
 
     var addBtn = document.getElementById("addMatchupBtn");
     if (addBtn) addBtn.addEventListener("click", function () {
