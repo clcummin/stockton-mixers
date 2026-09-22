@@ -912,7 +912,7 @@
       teamsSorted.map(function(t){ return '<option value="'+t.id+'"'+(t.id===state.entryTeamId?' selected':'')+'>'+escapeHtml(t.name)+'</option>'; }).join("") +
       '</select></div>'+(state.entryTeamId?'<button class="btn btn-sm" id="showAllEntryBtn">Show all</button>':'')+'</div><p class="entry-focus-hint">Choose your team once and this device will remember it. Only that week\'s matchup will be shown.</p></div>';
     html += teamChooser;
-    html += '<div class="photo-import"><div class="photo-import-title">Import scoreboard photo</div><p>Take or choose an AccuVision-style scoreboard photo. OCR runs in your browser, then you review every score before anything is saved.</p><label class="btn" for="scorePhotoInput">Take / choose photo</label><input id="scorePhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><div id="scorePhotoPreview"></div><div id="ocrStatus" class="ocr-status"></div><div id="ocrReview" class="ocr-review" style="display:none"></div></div>';
+    html += '<div class="photo-import"><div class="photo-import-title">Import scoreboard photo</div><p>Take or choose an AccuVision-style scoreboard photo. OCR runs in your browser, then you review every score before anything is saved.</p><div class="ocr-actions"><label class="btn btn-primary" for="scoreLibraryInput">Choose from library</label><label class="btn" for="scoreCameraInput">Take photo</label></div><input id="scoreLibraryInput" type="file" accept="image/*" style="display:none"><input id="scoreCameraInput" type="file" accept="image/*" capture="environment" style="display:none"><div id="scorePhotoPreview"></div><div id="ocrStatus" class="ocr-status"></div><div id="ocrReview" class="ocr-review" style="display:none"></div></div>';
 
     function buildTeamRows(team) {
       var bowlers = teamBowlers(team.id).sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -1012,15 +1012,19 @@
       if(state.entryTeamId) localStorage.setItem("leagueEntryTeamId",state.entryTeamId); else localStorage.removeItem("leagueEntryTeamId");
       renderEntry();
     });
-    var photoInput=document.getElementById("scorePhotoInput");
-    if(photoInput) photoInput.addEventListener("change",function(){
-      var file=photoInput.files && photoInput.files[0], preview=document.getElementById("scorePhotoPreview");
+    function handleScorePhotoInput(input){
+      var file=input.files && input.files[0], preview=document.getElementById("scorePhotoPreview");
       if(!file || !preview) return;
       var url=URL.createObjectURL(file);
       preview.innerHTML='<img class="photo-preview" alt="Scoreboard photo preview">';
       preview.querySelector("img").src=url;
       processScorePhoto(file,week);
-    });
+      input.value="";
+    }
+    var libraryInput=document.getElementById("scoreLibraryInput");
+    var cameraInput=document.getElementById("scoreCameraInput");
+    if(libraryInput) libraryInput.addEventListener("change",function(){handleScorePhotoInput(libraryInput);});
+    if(cameraInput) cameraInput.addEventListener("change",function(){handleScorePhotoInput(cameraInput);});
 
     var addBtn = document.getElementById("addMatchupBtn");
     if (addBtn) addBtn.addEventListener("click", function () {
