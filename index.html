@@ -438,7 +438,20 @@
   .entry-matchup-score .points { font-size:18px; font-weight:800; }
   @media(max-width:600px){ .photo-import{padding:12px}.entry-focus{padding:12px}.entry-focus-row .field{min-width:150px} }
 
+
+  .ocr-status { margin-top:10px; font-size:12px; color:var(--ink-soft); }
+  .ocr-review { margin-top:12px; border-top:1px solid var(--panel-edge); padding-top:12px; }
+  .ocr-review table { width:100%; border-collapse:collapse; font-size:13px; }
+  .ocr-review th,.ocr-review td { padding:7px 5px; border-bottom:1px solid var(--panel-edge); text-align:left; }
+  .ocr-review input { width:64px; padding:7px 5px; border:1px solid var(--panel-edge); border-radius:3px; background:var(--panel); color:var(--ink); }
+  .ocr-review .warn { color:var(--down); font-size:12px; }
+  .ocr-review .ok { color:var(--up); font-size:12px; }
+  .ocr-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .ocr-progress { height:5px; background:var(--bg-alt); border-radius:999px; overflow:hidden; margin-top:8px; }
+  .ocr-progress span { display:block; height:100%; background:var(--amber); width:0; transition:width .15s; }
+
 </style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -899,7 +912,7 @@
       teamsSorted.map(function(t){ return '<option value="'+t.id+'"'+(t.id===state.entryTeamId?' selected':'')+'>'+escapeHtml(t.name)+'</option>'; }).join("") +
       '</select></div>'+(state.entryTeamId?'<button class="btn btn-sm" id="showAllEntryBtn">Show all</button>':'')+'</div><p class="entry-focus-hint">Choose your team once and this device will remember it. Only that week\'s matchup will be shown.</p></div>';
     html += teamChooser;
-    html += '<div class="photo-import"><div class="photo-import-title">Scoreboard photo</div><p>Take or choose a photo as a reference while entering this matchup. The photo stays on this device and never changes scores automatically.</p><label class="btn" for="scorePhotoInput">Take / choose photo</label><input id="scorePhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><div id="scorePhotoPreview"></div></div>';
+    html += '<div class="photo-import"><div class="photo-import-title">Import scoreboard photo</div><p>Take or choose an AccuVision-style scoreboard photo. OCR runs in your browser, then you review every score before anything is saved.</p><label class="btn" for="scorePhotoInput">Take / choose photo</label><input id="scorePhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><div id="scorePhotoPreview"></div><div id="ocrStatus" class="ocr-status"></div><div id="ocrReview" class="ocr-review" style="display:none"></div></div>';
 
     function buildTeamRows(team) {
       var bowlers = teamBowlers(team.id).sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -1004,8 +1017,9 @@
       var file=photoInput.files && photoInput.files[0], preview=document.getElementById("scorePhotoPreview");
       if(!file || !preview) return;
       var url=URL.createObjectURL(file);
-      preview.innerHTML='<img class="photo-preview" alt="Scoreboard photo preview"><p style="margin-top:8px">Use the photo to verify the scores below. Nothing is imported or saved from the image itself.</p>';
+      preview.innerHTML='<img class="photo-preview" alt="Scoreboard photo preview">';
       preview.querySelector("img").src=url;
+      processScorePhoto(file,week);
     });
 
     var addBtn = document.getElementById("addMatchupBtn");
@@ -1020,6 +1034,74 @@
     });
 
     wireEntryInputs(el, week.id);
+  }
+
+
+  function normalizeOcrName(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+  function nameDistance(a,b){
+    a=normalizeOcrName(a); b=normalizeOcrName(b); var m=a.length,n=b.length,dp=[],i,j;
+    for(i=0;i<=m;i++){dp[i]=[i];} for(j=1;j<=n;j++)dp[0][j]=j;
+    for(i=1;i<=m;i++)for(j=1;j<=n;j++)dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+    return dp[m][n];
+  }
+  function parseScorePhotoText(text,week){
+    var lines=String(text||"").split(/\n+/).map(function(x){return x.trim();}).filter(Boolean);
+    var matchup=(week.matchups||[]).filter(function(m){return !state.entryTeamId||m.teamA===state.entryTeamId||m.teamB===state.entryTeamId;})[0];
+    var teamId=state.entryTeamId || (matchup&&matchup.teamA);
+    var roster=teamBowlers(teamId), rows=[];
+    roster.forEach(function(b){
+      var best=null,bestDist=999;
+      lines.forEach(function(line){
+        var d=nameDistance(line.replace(/\d+/g," "),b.name);
+        if(d<bestDist){bestDist=d;best=line;}
+      });
+      var nums=(best||"").match(/\b\d{1,3}\b/g)||[];
+      nums=nums.map(Number).filter(function(n){return n>=0&&n<=900;});
+      var games=nums.filter(function(n){return n<=300;}).slice(-4);
+      if(games.length>=4 && games[games.length-1]===games.slice(0,3).reduce(function(a,v){return a+v;},0)) games=games.slice(0,3);
+      else games=games.slice(0,3);
+      rows.push({bowler:b,games:games,source:best||"",confidence:best?Math.max(0,1-bestDist/Math.max(1,normalizeOcrName(b.name).length)):0});
+    });
+    return {teamId:teamId,rows:rows,raw:text};
+  }
+  async function processScorePhoto(file,week){
+    var status=document.getElementById("ocrStatus"),review=document.getElementById("ocrReview");
+    if(!window.Tesseract){ status.textContent="OCR library could not load. Check your connection and try again."; return; }
+    status.innerHTML='Reading scoreboard…<div class="ocr-progress"><span id="ocrProgressBar"></span></div>';
+    review.style.display="none";
+    try{
+      var worker=await Tesseract.createWorker("eng",1,{logger:function(m){var bar=document.getElementById("ocrProgressBar"); if(bar&&typeof m.progress==="number")bar.style.width=Math.round(m.progress*100)+"%";}});
+      var ret=await worker.recognize(file); await worker.terminate();
+      var parsed=parseScorePhotoText(ret.data.text,week); renderOcrReview(parsed,week);
+      status.textContent="OCR complete. Review the highlighted scores before saving.";
+    }catch(e){ status.textContent="Could not read this photo. Try a straighter, closer photo with the full score table visible."; }
+  }
+  function renderOcrReview(parsed,week){
+    var box=document.getElementById("ocrReview"); if(!box)return;
+    var html='<strong>Review imported scores</strong><table><thead><tr><th>Bowler</th>';
+    for(var g=0;g<state.settings.gamesPerWeek;g++)html+='<th>G'+(g+1)+'</th>';
+    html+='<th>Check</th></tr></thead><tbody>';
+    parsed.rows.forEach(function(r,ri){
+      var complete=r.games.length===state.settings.gamesPerWeek;
+      html+='<tr data-ocr-row="'+ri+'"><td>'+escapeHtml(r.bowler.name)+'</td>';
+      for(var gi=0;gi<state.settings.gamesPerWeek;gi++){var v=r.games[gi];html+='<td><input class="ocr-score num" data-game="'+gi+'" inputmode="numeric" maxlength="3" value="'+(typeof v==="number"?v:"")+'"></td>';}
+      html+='<td class="'+(complete?'ok':'warn')+'">'+(complete?'Review':'Needs input')+'</td></tr>';
+    });
+    html+='</tbody></table><div class="ocr-actions"><button class="btn btn-primary" id="confirmOcrBtn">Confirm & save scores</button><button class="btn" id="cancelOcrBtn">Cancel</button></div>';
+    box.innerHTML=html; box.style.display="block";
+    document.getElementById("cancelOcrBtn").onclick=function(){box.style.display="none";};
+    document.getElementById("confirmOcrBtn").onclick=function(){
+      var valid=true,pending=[];
+      parsed.rows.forEach(function(r,ri){
+        var tr=box.querySelector('[data-ocr-row="'+ri+'"]'),games=[];
+        tr.querySelectorAll(".ocr-score").forEach(function(inp){var n=parseInt(inp.value,10); if(isNaN(n)||n<0||n>300)valid=false; games.push(n);});
+        pending.push({bowler:r.bowler,games:games});
+      });
+      if(!valid){setStatus("Every imported game must be a number from 0 to 300.");return;}
+      if(!confirm("Save these "+(pending.length*state.settings.gamesPerWeek)+" game scores to Week "+week.number+"?"))return;
+      var jobs=pending.map(function(p){var id=week.id+"__"+p.bowler.id,payload={weekId:week.id,bowlerId:p.bowler.id,games:p.games,updatedAt:Date.now()}; return db.collection("scores").doc(id).set(payload);});
+      Promise.all(jobs).then(function(){setStatus("");box.innerHTML='<div class="ok"><strong>Scores saved.</strong> The matchup will update as the league data syncs.</div>';}).catch(function(){setStatus("Some imported scores could not be saved. Please verify the matchup before continuing.");});
+    };
   }
 
   function wireEntryInputs(root, weekId) {
