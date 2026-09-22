@@ -378,6 +378,48 @@
     input.score-input { width: 44px; padding: 7px 2px; font-size: 14px; }
     table.entry-grid .th-num, table.entry-grid td.num-cell { width: 48px; }
   }
+
+  /* Prototype polish */
+  body { line-height:1.4; }
+  main { max-width:1040px; }
+  .top-inner, nav.tabs, .status-bar { max-width:1040px; }
+  header.top { box-shadow:0 1px 8px rgba(0,0,0,.04); }
+  .brand-name { font-size:21px; }
+  nav.tabs { scrollbar-width:none; }
+  nav.tabs::-webkit-scrollbar { display:none; }
+  .page-title { font-weight:750; }
+  .dash-card, .result-card, .matchup-section, .team-card { box-shadow:0 1px 2px rgba(0,0,0,.035); }
+  .dash-card h2 { font-size:12px; text-transform:uppercase; letter-spacing:.055em; }
+  .dash-row { min-height:28px; }
+  .dashboard-grid { gap:12px; }
+  .week-bar { position:sticky; top:104px; z-index:10; background:color-mix(in srgb,var(--bg) 94%,transparent); backdrop-filter:blur(8px); padding:10px 0; margin-top:-10px; }
+  .matchup-section { background:var(--panel); border:1px solid var(--panel-edge); border-radius:var(--radius-md); padding:14px; margin-bottom:16px; overflow-x:auto; }
+  .matchup-summary { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+  .matchup-summary .hdcp-note { font-size:12px; color:var(--ink-soft); }
+  .entry-grid { min-width:620px; }
+  .score-input { font-size:16px !important; font-weight:650; min-height:42px; }
+  .score-input:focus { border-color:var(--amber) !important; box-shadow:0 0 0 2px color-mix(in srgb,var(--amber) 24%,transparent); }
+  .result-points strong { font-size:16px; }
+  .game-compare td.winner { font-weight:750; }
+  .status-bar { position:sticky; top:98px; z-index:30; background:var(--bg); }
+  @media (max-width:700px) {
+    .top-inner { padding:10px 12px 0; }
+    nav.tabs { padding:0 8px; margin-top:7px; }
+    nav.tabs button { padding:9px 10px 10px; font-size:13px; }
+    main { padding:16px 12px 78px; }
+    h1.page-title { font-size:20px; }
+    p.page-sub { margin-bottom:16px; font-size:13px; }
+    .dash-actions .btn { flex:1; justify-content:center; min-width:120px; }
+    .stat-tiles { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .week-bar { top:91px; overflow-x:auto; flex-wrap:nowrap; }
+    .week-bar .btn { white-space:nowrap; }
+    .matchup-section { margin-left:-4px; margin-right:-4px; padding:10px; }
+    .result-card { overflow-x:auto; }
+    .game-compare { min-width:540px; }
+    .brand-mark { font-size:19px; }
+    .brand-name { font-size:18px; max-width:62vw; }
+  }
+
 </style>
 </head>
 <body>
@@ -429,21 +471,21 @@
   <!-- RESULTS -->
   <section class="view" id="view-results">
     <h1 class="page-title">Results</h1>
-    <p class="page-sub">Each week's matchups, team vs team — scores, winner, and points. Individual bowler scores live under Bowler Stats.</p>
+    <p class="page-sub">Weekly matchup results with points first and total pins for detail and tiebreak context.</p>
     <div id="resultsContent"></div>
   </section>
 
   <!-- STANDINGS -->
   <section class="view" id="view-standings">
     <h1 class="page-title">Standings</h1>
-    <p class="page-sub">Team totals for the season, updated as scores come in.</p>
+    <p class="page-sub">Season ranking by points, with pins as supporting detail and tiebreak context.</p>
     <div id="standingsContent"></div>
   </section>
 
   <!-- BOWLERS -->
   <section class="view" id="view-bowlers">
     <h1 class="page-title">Bowler stats</h1>
-    <p class="page-sub">Averages, handicaps, and personal bests for every bowler in the league.</p>
+    <p class="page-sub">Averages, games bowled, recent form, and personal bests for every bowler in the league.</p>
     <div id="bowlersContent"></div>
   </section>
 
@@ -726,7 +768,7 @@
     var highGame = bowlers.filter(function(r){return r.high!==null;}).sort(function(a,b){return b.high-a.high;})[0];
     var highSeries = bowlers.filter(function(r){return r.series!==null;}).sort(function(a,b){return b.series-a.series;})[0];
 
-    var html = '<div class="dash-actions"><button class="btn btn-primary" data-dash-tab="entry">Enter scores</button><button class="btn" data-dash-tab="standings">Full standings</button><button class="btn" data-dash-tab="bowlers">Bowler stats</button></div>';
+    var html = '<div class="dash-actions"><button class="btn btn-primary" data-dash-tab="entry">Enter scores</button><button class="btn" data-dash-tab="results">Week results</button><button class="btn" data-dash-tab="standings">Standings</button></div>';
     html += '<div class="stat-tiles">' +
       tile("Current week", current ? "Week " + current.number : "–", current && current.date ? fmtDate(current.date) : "No week started") +
       tile("Teams", state.teams.length, state.bowlers.length + " bowlers") +
@@ -736,7 +778,7 @@
 
     html += '<section class="dash-card"><h2>Standings</h2><div class="dash-list">';
     if (!standings.length) html += '<span style="color:var(--ink-faint)">No teams yet.</span>';
-    standings.slice(0,5).forEach(function(r,i){ html += '<div class="dash-row"><span><span class="dash-rank">'+(i+1)+'</span>'+escapeHtml(r.team.name)+'</span><strong class="num">'+r.points+' pts</strong></div>'; });
+    standings.slice(0,5).forEach(function(r,i){ html += '<div class="dash-row"><span><span class="dash-rank">'+(i+1)+'</span>'+escapeHtml(r.team.name)+'</span><span style="text-align:right"><strong class="num">'+r.points+' pts</strong><small class="num" style="display:block;color:var(--ink-faint)">'+r.pins+' pins</small></span></div>'; });
     html += '</div></section>';
 
     html += '<section class="dash-card"><h2>Average leaders</h2><div class="dash-list">';
@@ -842,7 +884,7 @@
           rows += '<td class="num-cell"><input class="score-input num" inputmode="numeric" pattern="[0-9]*" maxlength="3" data-game="' + gi + '" value="' + val + '" aria-label="' + escapeHtml(b.name) + " game " + (gi + 1) + '"></td>';
         }
         rows += '<td class="derived num">' + (series !== null ? series : "–") + '</td>';
-        if (useH) rows += '<td class="derived num">team</td>';
+
         rows += '<td class="save-indicator" style="white-space:nowrap;">Saved</td>';
         rows += '</tr>';
       });
@@ -851,7 +893,7 @@
 
     function gridTable(rowsHtml) {
       return '<table class="entry-grid"><thead><tr><th></th>' + gameHeaders +
-        '<th class="th-num">Series</th>' + (useH ? '<th class="th-num">Hdcp</th>' : "") + '<th></th></tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+        '<th class="th-num">Series</th><th></th></tr></thead><tbody>' + rowsHtml + '</tbody></table>';
     }
 
     var matchups = week.matchups || [];
@@ -861,8 +903,9 @@
     matchups.forEach(function (m) {
       matchedIds[m.teamA] = true; matchedIds[m.teamB] = true;
       var ta = byId(state.teams, m.teamA), tb = byId(state.teams, m.teamB);
-      sectionsHtml += '<div class="matchup-section"><div class="result-head" style="background:none;border:none;padding:0 0 10px 0;">' +
-        '<div class="vs-line">' + escapeHtml(ta ? ta.name : "?") + '<span class="vs-sep">vs</span>' + escapeHtml(tb ? tb.name : "?") + '</div></div>';
+      var mh=matchupHandicap(week.id,m.teamA,m.teamB);
+      sectionsHtml += '<div class="matchup-section"><div class="matchup-summary"><div class="vs-line">' + escapeHtml(ta ? ta.name : "?") + '<span class="vs-sep">vs</span>' + escapeHtml(tb ? tb.name : "?") + '</div>' +
+        (useH ? '<div class="hdcp-note">Incoming <span class="num">'+round1(mh.aAvg)+'</span>–<span class="num">'+round1(mh.bAvg)+'</span> · Team handicap <strong class="num">'+mh.a+'–'+mh.b+'</strong> / game</div>' : '') + '</div>';
       sectionsHtml += gridTable(buildTeamRows(ta || { id: m.teamA, name: "?" }) + buildTeamRows(tb || { id: m.teamB, name: "?" }));
       sectionsHtml += '</div>';
     });
@@ -876,8 +919,8 @@
     html += sectionsHtml;
 
     // matchups
-    html += '<div class="matchup-panel"><h2 class="block-title">Matchups this week (optional)</h2>';
-    html += '<p style="font-size:13px;color:var(--ink-soft);margin:0 0 8px 0;">Pair up teams to track points, not just pins. Skip this if your league just tracks individual stats.</p>';
+    html += '<div class="matchup-panel"><h2 class="block-title">Week matchups</h2>';
+    html += '<p style="font-size:13px;color:var(--ink-soft);margin:0 0 8px 0;">Matchups drive league points and the team handicap. Each team can appear once per week.</p>';
     html += '<div class="matchup-list">';
     (week.matchups || []).forEach(function (m, idx) {
       var ta = byId(state.teams, m.teamA), tb = byId(state.teams, m.teamB);
