@@ -431,6 +431,13 @@
   .photo-import p { color:var(--ink-soft); font-size:12px; margin:0 0 10px; }
   .photo-preview { max-width:100%; max-height:220px; border-radius:var(--radius-sm); display:block; margin-top:10px; }
 
+
+  .entry-matchup-score { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; margin:2px 0 12px; padding:10px 12px; background:var(--bg-alt); border-radius:var(--radius-sm); }
+  .entry-matchup-score .side:last-child { text-align:right; }
+  .entry-matchup-score .team-name { font-weight:700; }
+  .entry-matchup-score .points { font-size:18px; font-weight:800; }
+  @media(max-width:600px){ .photo-import{padding:12px}.entry-focus{padding:12px}.entry-focus-row .field{min-width:150px} }
+
 </style>
 </head>
 <body>
@@ -631,9 +638,22 @@
 
   // A team's incoming average is frozen at the start of a week: each bowler's
   // average before that week's games, summed for the team.
+  function bowlerIncomingAverage(bowlerId, weekId) {
+    var b=byId(state.bowlers,bowlerId), target=byId(state.weeks,weekId);
+    if(!target) return bowlerAverage(bowlerId);
+    var prior={};
+    state.weeks.forEach(function(w){ if(w.number < target.number) prior[w.id]=true; });
+    var games=[];
+    state.scores.forEach(function(s){
+      if(s.bowlerId!==bowlerId || !prior[s.weekId]) return;
+      (s.games||[]).forEach(function(g){ if(typeof g==="number"&&!isNaN(g)) games.push(g); });
+    });
+    if(!games.length) return (b&&typeof b.enteringAvg==="number") ? b.enteringAvg : 0;
+    return games.reduce(function(a,g){return a+g;},0)/games.length;
+  }
   function teamIncomingAverage(teamId, weekId) {
     return teamBowlers(teamId).reduce(function (sum, b) {
-      return sum + bowlerAverage(b.id, weekId);
+      return sum + bowlerIncomingAverage(b.id, weekId);
     }, 0);
   }
 
@@ -875,11 +895,11 @@
     var teamsSorted = state.teams.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
 
     if (state.entryTeamId && !byId(state.teams,state.entryTeamId)) state.entryTeamId=null;
-    var teamChooser = '<div class="entry-focus"><div class="entry-focus-row"><div class="field"><label>My team</label><select id="entryTeamSelect"><option value="">Show all teams</option>' +
+    var teamChooser = '<div class="entry-focus"><div class="entry-focus-row"><div class="field"><label>My team</label><select id="entryTeamSelect"><option value="">Choose my team…</option>' +
       teamsSorted.map(function(t){ return '<option value="'+t.id+'"'+(t.id===state.entryTeamId?' selected':'')+'>'+escapeHtml(t.name)+'</option>'; }).join("") +
-      '</select></div></div><p class="entry-focus-hint">Choose your team once and this device will remember it. Only that week\'s matchup will be shown.</p></div>';
+      '</select></div>'+(state.entryTeamId?'<button class="btn btn-sm" id="showAllEntryBtn">Show all</button>':'')+'</div><p class="entry-focus-hint">Choose your team once and this device will remember it. Only that week\'s matchup will be shown.</p></div>';
     html += teamChooser;
-    html += '<div class="photo-import"><div class="photo-import-title">Scoreboard photo</div><p>Take or choose a photo now. The prototype keeps it on this device for review; automatic score extraction is the next step and will always require confirmation before saving.</p><label class="btn" for="scorePhotoInput">Choose photo</label><input id="scorePhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><div id="scorePhotoPreview"></div></div>';
+    html += '<div class="photo-import"><div class="photo-import-title">Scoreboard photo</div><p>Take or choose a photo as a reference while entering this matchup. The photo stays on this device and never changes scores automatically.</p><label class="btn" for="scorePhotoInput">Take / choose photo</label><input id="scorePhotoInput" type="file" accept="image/*" capture="environment" style="display:none"><div id="scorePhotoPreview"></div></div>';
 
     function buildTeamRows(team) {
       var bowlers = teamBowlers(team.id).sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -889,7 +909,7 @@
         var doc = scoreDocFor(week.id, b.id);
         var games = doc ? doc.games.slice() : [];
         while (games.length < gcount) games.push(null);
-        var avg = bowlerAverage(b.id, week.id);
+        var avg = bowlerIncomingAverage(b.id, week.id);
         var hdcp = 0;
         var validGames = games.filter(function (v) { return typeof v === "number"; });
         var series = validGames.length ? validGames.reduce(function (a, v) { return a + v; }, 0) : null;
@@ -923,9 +943,10 @@
     focusedMatchups.forEach(function (m) {
       matchedIds[m.teamA] = true; matchedIds[m.teamB] = true;
       var ta = byId(state.teams, m.teamA), tb = byId(state.teams, m.teamB);
-      var mh=matchupHandicap(week.id,m.teamA,m.teamB);
+      var mh=matchupHandicap(week.id,m.teamA,m.teamB), mp=matchupPoints(week.id,m.teamA,m.teamB);
       sectionsHtml += '<div class="matchup-section"><div class="matchup-summary"><div class="vs-line">' + escapeHtml(ta ? ta.name : "?") + '<span class="vs-sep">vs</span>' + escapeHtml(tb ? tb.name : "?") + '</div>' +
-        (useH ? '<div class="hdcp-note">Incoming <span class="num">'+round1(mh.aAvg)+'</span>–<span class="num">'+round1(mh.bAvg)+'</span> · Team handicap <strong class="num">'+mh.a+'–'+mh.b+'</strong> / game</div>' : '') + '</div>';
+        (useH ? '<div class="hdcp-note">Incoming <span class="num">'+round1(mh.aAvg)+'</span>–<span class="num">'+round1(mh.bAvg)+'</span> · Team handicap <strong class="num">'+mh.a+'–'+mh.b+'</strong> / game</div>' : '') + '</div>' +
+        '<div class="entry-matchup-score"><div class="side"><div class="team-name">'+escapeHtml(ta?ta.name:"?")+'</div><div><span class="points num">'+mp.a+'</span> pts · <span class="num">'+mp.aTotals.series+'</span> pins</div></div><strong>vs</strong><div class="side"><div class="team-name">'+escapeHtml(tb?tb.name:"?")+'</div><div><span class="points num">'+mp.b+'</span> pts · <span class="num">'+mp.bTotals.series+'</span> pins</div></div></div>';
       sectionsHtml += gridTable(buildTeamRows(ta || { id: m.teamA, name: "?" }) + buildTeamRows(tb || { id: m.teamB, name: "?" }));
       sectionsHtml += '</div>';
     });
@@ -970,6 +991,8 @@
     document.getElementById("newWeekBtn").addEventListener("click", function () { createWeek(); });
     document.getElementById("deleteWeekBtn").addEventListener("click", function () { deleteWeek(week.id); });
 
+    var showAllBtn=document.getElementById("showAllEntryBtn");
+    if(showAllBtn) showAllBtn.addEventListener("click",function(){ state.entryTeamId=null; localStorage.removeItem("leagueEntryTeamId"); renderEntry(); });
     var teamSelect=document.getElementById("entryTeamSelect");
     if(teamSelect) teamSelect.addEventListener("change",function(){
       state.entryTeamId=teamSelect.value || null;
@@ -981,7 +1004,7 @@
       var file=photoInput.files && photoInput.files[0], preview=document.getElementById("scorePhotoPreview");
       if(!file || !preview) return;
       var url=URL.createObjectURL(file);
-      preview.innerHTML='<img class="photo-preview" alt="Scoreboard photo preview"><p style="margin-top:8px">Photo ready for review. No scores have been changed.</p>';
+      preview.innerHTML='<img class="photo-preview" alt="Scoreboard photo preview"><p style="margin-top:8px">Use the photo to verify the scores below. Nothing is imported or saved from the image itself.</p>';
       preview.querySelector("img").src=url;
     });
 
