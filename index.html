@@ -542,20 +542,14 @@
     var sum = games.reduce(function (a, g) { return a + g; }, 0);
     return sum / games.length;
   }
-  function bowlerHandicap(bowlerId, excludeWeekId) {
-    if (state.settings.scratchLeague) return 0;
-    var avg = bowlerAverage(bowlerId, excludeWeekId);
-    var hdcp = (state.settings.handicapBase - avg) * state.settings.handicapPercent;
-    return Math.max(0, Math.round(hdcp));
-  }
+  function bowlerHandicap() { return 0; } // Handicap is team-vs-team, not individual.
   function bowlerGamesCount(bowlerId) { return allGamesForBowler(bowlerId).length; }
   function bowlerHighGame(bowlerId) {
     var games = allGamesForBowler(bowlerId);
     return games.length ? Math.max.apply(null, games) : null;
   }
   function bowlerHighSeries(bowlerId) {
-    var scores = scoresForBowler(bowlerId);
-    var best = null;
+    var scores = scoresForBowler(bowlerId), best = null;
     scores.forEach(function (s) {
       var valid = (s.games || []).filter(function (g) { return typeof g === "number" && !isNaN(g); });
       if (!valid.length) return;
@@ -573,30 +567,53 @@
   }
   function teamBowlers(teamId) { return state.bowlers.filter(function (b) { return b.teamId === teamId; }); }
 
-  function teamWeekTotals(teamId, weekId, handicap) {
-    // returns { perGame:[sum,...], series }
-    var bowlers = teamBowlers(teamId);
-    var per = [];
+  // A team's incoming average is frozen at the start of a week: each bowler's
+  // average before that week's games, summed for the team.
+  function teamIncomingAverage(teamId, weekId) {
+    return teamBowlers(teamId).reduce(function (sum, b) {
+      return sum + bowlerAverage(b.id, weekId);
+    }, 0);
+  }
+
+  // Matchup handicap: 90% of the difference between the two incoming team
+  // averages. Only the lower-average team receives pins, and the same value
+  // applies to all three games in that matchup.
+  function matchupHandicap(weekId, teamAId, teamBId) {
+    if (state.settings.scratchLeague) return { a:0, b:0, aAvg:teamIncomingAverage(teamAId,weekId), bAvg:teamIncomingAverage(teamBId,weekId) };
+    var aAvg = teamIncomingAverage(teamAId, weekId), bAvg = teamIncomingAverage(teamBId, weekId);
+    var pins = Math.round(Math.abs(aAvg - bAvg) * 0.90);
+    return { a:aAvg < bAvg ? pins : 0, b:bAvg < aAvg ? pins : 0, aAvg:aAvg, bAvg:bAvg };
+  }
+
+  function teamWeekTotals(teamId, weekId, handicapPins) {
+    var bowlers = teamBowlers(teamId), per = [];
     for (var g = 0; g < state.settings.gamesPerWeek; g++) per.push(0);
-    var series = 0;
     bowlers.forEach(function (b) {
       var doc = scoreDocFor(weekId, b.id);
-      var hdcp = handicap ? bowlerHandicap(b.id) : 0;
       for (var g2 = 0; g2 < state.settings.gamesPerWeek; g2++) {
         var val = doc && typeof doc.games[g2] === "number" ? doc.games[g2] : 0;
-        var withH = val ? val + hdcp : 0;
-        per[g2] += withH;
-        series += withH;
+        per[g2] += val;
       }
     });
-    return { perGame: per, series: series };
+    var pins = typeof handicapPins === "number" ? handicapPins : 0;
+    var adjusted = per.map(function(v){ return v > 0 ? v + pins : 0; });
+    return { perGame:adjusted, scratchPerGame:per, series:adjusted.reduce(function(a,v){return a+v;},0), scratchSeries:per.reduce(function(a,v){return a+v;},0), handicap:pins };
   }
 
   function teamSeasonTotal(teamId, handicap) {
     var team = byId(state.teams, teamId);
     var total = handicap && team && typeof team.startPins === "number" ? team.startPins : 0;
     state.weeks.forEach(function (w) {
-      total += teamWeekTotals(teamId, w.id, handicap).series;
+      var pins = 0;
+      if (handicap && !state.settings.scratchLeague) {
+        (w.matchups || []).some(function(m){
+          if (m.teamA !== teamId && m.teamB !== teamId) return false;
+          var h = matchupHandicap(w.id, m.teamA, m.teamB);
+          pins = m.teamA === teamId ? h.a : h.b;
+          return true;
+        });
+      }
+      total += teamWeekTotals(teamId, w.id, pins).series;
     });
     return total;
   }
@@ -607,15 +624,8 @@
     state.weeks.forEach(function (w) {
       (w.matchups || []).forEach(function (m) {
         if (m.teamA !== teamId && m.teamB !== teamId) return;
-        var opp = m.teamA === teamId ? m.teamB : m.teamA;
-        var mine = teamWeekTotals(teamId, w.id, true);
-        var theirs = teamWeekTotals(opp, w.id, true);
-        for (var g = 0; g < state.settings.gamesPerWeek; g++) {
-          if (mine.perGame[g] > theirs.perGame[g]) pts += 1;
-          else if (mine.perGame[g] === theirs.perGame[g] && mine.perGame[g] > 0) pts += 0.5;
-        }
-        if (mine.series > theirs.series) pts += 1;
-        else if (mine.series === theirs.series && mine.series > 0) pts += 0.5;
+        var mp = matchupPoints(w.id, m.teamA, m.teamB);
+        pts += m.teamA === teamId ? mp.a : mp.b;
       });
     });
     return pts;
@@ -806,20 +816,20 @@
         var games = doc ? doc.games.slice() : [];
         while (games.length < gcount) games.push(null);
         var avg = bowlerAverage(b.id, week.id);
-        var hdcp = bowlerHandicap(b.id, week.id);
+        var hdcp = 0;
         var validGames = games.filter(function (v) { return typeof v === "number"; });
         var series = validGames.length ? validGames.reduce(function (a, v) { return a + v; }, 0) : null;
-        var hdcpSeries = series !== null ? series + hdcp * gcount : null;
+        var hdcpSeries = series;
 
         rows += '<tr data-bowler="' + b.id + '">';
         rows += '<td class="bowler-name-cell">' + escapeHtml(b.name) +
-          '<span class="avg num">avg ' + round1(avg) + (useH ? " · hdcp " + hdcp : "") + '</span></td>';
+          '<span class="avg num">avg ' + round1(avg) + "" + '</span></td>';
         for (var gi = 0; gi < gcount; gi++) {
           var val = games[gi] === null || games[gi] === undefined ? "" : games[gi];
           rows += '<td class="num-cell"><input class="score-input num" inputmode="numeric" pattern="[0-9]*" maxlength="3" data-game="' + gi + '" value="' + val + '" aria-label="' + escapeHtml(b.name) + " game " + (gi + 1) + '"></td>';
         }
         rows += '<td class="derived num">' + (series !== null ? series : "–") + '</td>';
-        if (useH) rows += '<td class="derived num">' + (hdcpSeries !== null ? hdcpSeries : "–") + '</td>';
+        if (useH) rows += '<td class="derived num">team</td>';
         rows += '<td class="save-indicator" style="white-space:nowrap;">Saved</td>';
         rows += '</tr>';
       });
@@ -1280,8 +1290,9 @@
   }
 
   function matchupPoints(weekId, teamAId, teamBId) {
-    var a = teamWeekTotals(teamAId, weekId, true);
-    var b = teamWeekTotals(teamBId, weekId, true);
+    var h = matchupHandicap(weekId, teamAId, teamBId);
+    var a = teamWeekTotals(teamAId, weekId, h.a);
+    var b = teamWeekTotals(teamBId, weekId, h.b);
     var aPts = 0, bPts = 0;
     for (var g = 0; g < a.perGame.length; g++) {
       if (a.perGame[g] > b.perGame[g]) aPts += 1;
@@ -1291,7 +1302,7 @@
     if (a.series > b.series) aPts += 1;
     else if (a.series < b.series) bPts += 1;
     else if (a.series > 0) { aPts += 0.5; bPts += 0.5; }
-    return { a: aPts, b: bPts, aTotals: a, bTotals: b };
+    return { a:aPts, b:bPts, aTotals:a, bTotals:b, handicap:h };
   }
 
   function miniRosterTable(teamId, weekId) {
@@ -1344,6 +1355,7 @@
         var gh = "";
         for (var g = 0; g < gcount; g++) gh += "<th>G" + (g + 1) + "</th>";
         html += '<div class="result-card">';
+        if (useH) html += '<div style="padding:8px 16px;font-size:12px;color:var(--ink-soft);border-bottom:1px solid var(--panel-edge)">Incoming averages: <span class="num">' + round1(mp.handicap.aAvg) + '</span> vs <span class="num">' + round1(mp.handicap.bAvg) + '</span> · Team handicap: <strong class="num">' + mp.handicap.a + '–' + mp.handicap.b + '</strong> per game</div>';
         html += '<div class="result-head"><div class="vs-line">' + escapeHtml(ta ? ta.name : "?") + '<span class="vs-sep">vs</span>' + escapeHtml(tb ? tb.name : "?") + '</div>' +
           '<div class="result-points">Points: <b>' + mp.a + '</b> – <b>' + mp.b + '</b></div></div>';
         html += '<table class="game-compare"><thead><tr><th class="team-label-th"></th>' + gh + '<th>Series</th></tr></thead><tbody>';
@@ -1462,14 +1474,13 @@
       };
     }).sort(function (a, b2) { return b2.avg - a.avg; });
 
-    var colspan = 6 + (useH ? 1 : 0);
+    var colspan = 6;
     var html = '<p style="font-size:12.5px;color:var(--ink-faint);margin:-6px 0 10px 0">Tap a bowler to see their week-by-week scores.</p>';
     html += '<table class="standings"><thead><tr><th class="rank">#</th><th>Bowler</th><th>Team</th><th class="num-col">Games</th><th class="num-col">Avg</th>' +
-      (useH ? '<th class="num-col">Hdcp</th>' : '') + '<th class="num-col">High game</th><th class="num-col">High series</th></tr></thead><tbody>';
+      '<th class="num-col">High game</th><th class="num-col">High series</th></tr></thead><tbody>';
     rows.forEach(function (r, i) {
       html += '<tr class="bowler-row-clickable" data-bowler-id="' + r.b.id + '"><td class="rank">' + (i + 1) + '</td><td><span class="disclosure-icon">▸</span>' + escapeHtml(r.b.name) + '</td><td style="color:var(--ink-soft)">' + escapeHtml(r.team ? r.team.name : "—") + '</td>' +
         '<td class="num-col num">' + r.games + '</td><td class="num-col num">' + round1(r.avg) + '</td>' +
-        (useH ? '<td class="num-col num">' + r.hdcp + '</td>' : '') +
         '<td class="num-col num">' + (r.high !== null ? r.high : "–") + '</td>' +
         '<td class="num-col num">' + (r.highSeries !== null ? r.highSeries : "–") + '</td></tr>';
       html += '<tr class="bowler-detail-row" data-detail-for="' + r.b.id + '" style="display:none"><td colspan="' + colspan + '"><div class="bowler-detail-inner"></div></td></tr>';
@@ -1531,7 +1542,7 @@
     var profile = '<div class="bowler-profile-head"><div><div class="bowler-profile-name">'+escapeHtml(bowler.name)+'</div><div class="bowler-profile-team">'+escapeHtml(team?team.name:"No team")+' · '+allGames.length+' games bowled</div></div></div>';
     profile += '<div class="bowler-profile-stats">' +
       '<div class="bowler-profile-stat"><span>Season average</span><strong class="num">'+round1(avg)+'</strong></div>' +
-      (useH?'<div class="bowler-profile-stat"><span>Handicap</span><strong class="num">'+hdcp+'</strong></div>':'') +
+      '' +
       '<div class="bowler-profile-stat"><span>High game</span><strong class="num">'+(high===null?"–":high)+'</strong></div>' +
       '<div class="bowler-profile-stat"><span>High series</span><strong class="num">'+(highSeries===null?"–":highSeries)+'</strong></div>' +
       '<div class="bowler-profile-stat"><span>Last 3 weeks</span><strong class="num">'+(recentAvg===null?"–":round1(recentAvg))+'</strong></div>' +
@@ -1545,10 +1556,10 @@
       var games=p.games.slice(); while(games.length<gcount) games.push(null);
       games.forEach(function(v){ rowsHtml += '<td class="num">'+(typeof v==="number"?v:"–")+'</td>'; });
       rowsHtml += '<td class="num" style="font-weight:600">'+p.series+'</td>';
-      if(useH) rowsHtml += '<td class="num">'+(p.series+hdcp*gcount)+'</td>';
+      
       rowsHtml += '</tr>';
     });
-    return profile + '<table class="week-log"><thead><tr><th class="week-th">Week</th>'+gh+'<th>Series</th>'+(useH?'<th>Hdcp series</th>':'')+'</tr></thead><tbody>'+rowsHtml+'</tbody></table>';
+    return profile + '<table class="week-log"><thead><tr><th class="week-th">Week</th>'+gh+'<th>Series</th>'+'</tr></thead><tbody>'+rowsHtml+'</tbody></table>';
   }
 
   // ---------------------------------------------------------------
@@ -1571,8 +1582,8 @@
     html += '<div class="field"><label>Games per week</label><input type="number" id="gamesPerWeek" min="1" max="6" value="' + s.gamesPerWeek + '" style="width:80px"></div>';
     html += '<div class="field"><label>Scoring</label><select id="scratchToggle"><option value="handicap"' + (!s.scratchLeague ? ' selected' : '') + '>Handicap</option><option value="scratch"' + (s.scratchLeague ? ' selected' : '') + '>Scratch</option></select></div>';
     if (!s.scratchLeague) {
-      html += '<div class="field"><label>Handicap base</label><input type="number" id="hdcpBase" value="' + s.handicapBase + '" style="width:90px"></div>';
-      html += '<div class="field"><label>Handicap %</label><input type="number" id="hdcpPct" min="0" max="100" value="' + Math.round(s.handicapPercent * 100) + '" style="width:80px"></div>';
+      html += '<div class="field"><label>Legacy handicap base</label><input type="number" id="hdcpBase" value="' + s.handicapBase + '" style="width:90px"></div>';
+      html += '<div class="field"><label>Team handicap %</label><input type="number" id="hdcpPct" min="0" max="100" value="' + Math.round(s.handicapPercent * 100) + '" style="width:80px"></div>';
     }
     html += '</div><button class="btn btn-sm" id="saveFormatBtn">Save format</button></section>';
 
