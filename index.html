@@ -553,7 +553,8 @@
     expandedTeamId: null,
     pendingScoreSaves: 0,
     lastSyncError: null,
-    entryTeamId: localStorage.getItem("leagueEntryTeamId") || null
+    entryTeamId: localStorage.getItem("leagueEntryTeamId") || null,
+    scorePhotoBusy: false
   };
 
   var db = null;
@@ -1069,8 +1070,9 @@
     return {teamId:teamId,rows:rows,raw:text};
   }
   async function processScorePhoto(file,week){
+    state.scorePhotoBusy=true;
     var status=document.getElementById("ocrStatus"),review=document.getElementById("ocrReview");
-    if(!window.Tesseract){ status.textContent="OCR library could not load. Check your connection and try again."; return; }
+    if(!window.Tesseract){ status.textContent="OCR library could not load. Check your connection and try again."; state.scorePhotoBusy=false; return; }
     status.innerHTML='Reading scoreboard…<div class="ocr-progress"><span id="ocrProgressBar"></span></div>';
     review.style.display="none";
     try{
@@ -1078,7 +1080,8 @@
       var ret=await worker.recognize(file); await worker.terminate();
       var parsed=parseScorePhotoText(ret.data.text,week); renderOcrReview(parsed,week);
       status.textContent="OCR complete. Review the highlighted scores before saving.";
-    }catch(e){ status.textContent="Could not read this photo. Try a straighter, closer photo with the full score table visible."; }
+      state.scorePhotoBusy=false;
+    }catch(e){ status.textContent="Could not read this photo. Try a straighter, closer photo with the full score table visible."; state.scorePhotoBusy=false; }
   }
   function renderOcrReview(parsed,week){
     var box=document.getElementById("ocrReview"); if(!box)return;
@@ -1986,10 +1989,11 @@
     var loadedFlags = { settings: false, teams: false, bowlers: false, weeks: false, scores: false };
     function checkReady() {
       if (Object.keys(loadedFlags).every(function (k) { return loadedFlags[k]; })) {
+        var wasReady=state.ready;
         state.ready = true;
         if (!leagueNameInput.matches(":focus")) leagueNameInput.value = state.settings.leagueName;
         document.title = state.settings.leagueName;
-        renderAll();
+        if(!wasReady) renderAll();
       }
     }
 
@@ -2006,7 +2010,7 @@
       }
       loadedFlags.settings = true;
       var settingsSignature = JSON.stringify(state.settings);
-      if (state.ready && settingsSignature !== subscribeAll._lastSettingsSignature) {
+      if (state.ready && settingsSignature !== subscribeAll._lastSettingsSignature && !state.scorePhotoBusy) {
         subscribeAll._lastSettingsSignature = settingsSignature;
         if (!leagueNameInput.matches(":focus")) leagueNameInput.value = state.settings.leagueName;
         document.title = state.settings.leagueName;
@@ -2021,7 +2025,7 @@
       var teamsChanged = JSON.stringify(state.teams) !== JSON.stringify(nextTeams);
       state.teams = nextTeams;
       loadedFlags.teams = true;
-      if (state.ready && teamsChanged) renderAll();
+      if (state.ready && teamsChanged && !state.scorePhotoBusy) renderAll();
       checkReady();
     }, function () { loadedFlags.teams = true; checkReady(); }));
 
@@ -2030,7 +2034,7 @@
       var bowlersChanged = JSON.stringify(state.bowlers) !== JSON.stringify(nextBowlers);
       state.bowlers = nextBowlers;
       loadedFlags.bowlers = true;
-      if (state.ready && bowlersChanged) renderAll();
+      if (state.ready && bowlersChanged && !state.scorePhotoBusy) renderAll();
       checkReady();
     }, function () { loadedFlags.bowlers = true; checkReady(); }));
 
@@ -2039,7 +2043,7 @@
       var weeksChanged = JSON.stringify(state.weeks) !== JSON.stringify(nextWeeks);
       state.weeks = nextWeeks;
       loadedFlags.weeks = true;
-      if (state.ready && weeksChanged) renderAll();
+      if (state.ready && weeksChanged && !state.scorePhotoBusy) renderAll();
       checkReady();
     }, function () { loadedFlags.weeks = true; checkReady(); }));
 
@@ -2048,7 +2052,7 @@
       var scoresChanged = JSON.stringify(state.scores) !== JSON.stringify(nextScores);
       state.scores = nextScores;
       loadedFlags.scores = true;
-      if (state.ready && scoresChanged && !state.bulkOperationInProgress) {
+      if (state.ready && scoresChanged && !state.bulkOperationInProgress && !state.scorePhotoBusy) {
         // avoid clobbering an in-progress entry row's focused input on every remote update
         var activeEl = document.activeElement;
         var isTypingScore = activeEl && activeEl.classList && activeEl.classList.contains("score-input");
