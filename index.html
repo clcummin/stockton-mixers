@@ -309,6 +309,11 @@
   .bowler-profile-stat span { display:block; font-size:10.5px; color:var(--ink-faint); margin-bottom:4px; }
   .bowler-profile-stat strong { font-size:17px; }
   .trend-up { color:var(--up); } .trend-down { color:var(--down); }
+  .team-row-clickable { cursor:pointer; } .team-row-clickable:hover { background:var(--bg-alt); }
+  .team-detail { padding:14px; background:var(--bg-alt); }
+  .team-roster-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:8px; margin-top:12px; }
+  .team-roster-person { background:var(--panel); border:1px solid var(--panel-edge); border-radius:var(--radius-sm); padding:10px; }
+  .rule-note { margin:0 0 16px; padding:10px 12px; border:1px solid var(--panel-edge); border-radius:var(--radius-sm); color:var(--ink-soft); font-size:12.5px; }
   @media (max-width:640px) { .bowler-profile-stats { grid-template-columns:repeat(2,1fr); } }
   table.week-log { width: 100%; border-collapse: collapse; margin-top: 6px; }
   table.week-log th { font-size: 10.5px; color: var(--ink-faint); font-weight: 600; text-align: center; padding: 5px 4px; }
@@ -471,7 +476,10 @@
     activeWeekId: null,
     bulkOperationInProgress: false,
     simProgressText: "",
-    expandedBowlerId: null
+    expandedBowlerId: null,
+    expandedTeamId: null,
+    pendingScoreSaves: 0,
+    lastSyncError: null
   };
 
   var db = null;
@@ -738,7 +746,7 @@
 
     html += '<section class="dash-card wide"><h2>' + (current ? 'Week '+current.number+' matchups' : 'Current week') + '</h2><div class="dash-list">';
     if (!current || !(current.matchups||[]).length) html += '<span style="color:var(--ink-faint)">No matchups scheduled yet.</span>';
-    else (current.matchups||[]).forEach(function(m){ var a=byId(state.teams,m.teamA), b=byId(state.teams,m.teamB); html += '<div class="dash-row"><span>'+escapeHtml(a?a.name:"TBD")+' <span style="color:var(--ink-faint)">vs</span> '+escapeHtml(b?b.name:"TBD")+'</span></div>'; });
+    else (current.matchups||[]).forEach(function(m){ var a=byId(state.teams,m.teamA), b=byId(state.teams,m.teamB); var h=matchupHandicap(current.id,m.teamA,m.teamB); html += '<div class="dash-row"><span>'+escapeHtml(a?a.name:"TBD")+' <span style="color:var(--ink-faint)">vs</span> '+escapeHtml(b?b.name:"TBD")+'</span><span class="num" style="color:var(--ink-soft)">Hdcp '+h.a+'–'+h.b+'</span></div>'; });
     html += '</div></section></div>';
     el.innerHTML = html;
     el.querySelectorAll("[data-dash-tab]").forEach(function(btn){ btn.addEventListener("click",function(){ showTab(btn.getAttribute("data-dash-tab")); }); });
@@ -750,9 +758,14 @@
   var saveScoreDebounced = debounce(function (key, weekId, bowlerId, games, rowEl) {
     if (!db) { flashSave(rowEl, false); return; }
     var docId = weekId + "__" + bowlerId;
-    db.collection("scores").doc(docId).set({ weekId: weekId, bowlerId: bowlerId, games: games, updatedAt: Date.now() })
-      .then(function () { flashSave(rowEl, true); })
-      .catch(function () { flashSave(rowEl, false); });
+    var existing = scoreDocFor(weekId, bowlerId);
+    var payload = { weekId:weekId, bowlerId:bowlerId, games:games, updatedAt:Date.now() };
+    if (existing) Object.assign(existing, payload); else state.scores.push(Object.assign({id:docId},payload));
+    state.pendingScoreSaves++;
+    setStatus("Saving score…");
+    db.collection("scores").doc(docId).set(payload)
+      .then(function () { state.pendingScoreSaves--; flashSave(rowEl,true); if(!state.pendingScoreSaves) setStatus(""); })
+      .catch(function (err) { state.pendingScoreSaves--; state.lastSyncError=String(err); flashSave(rowEl,false); setStatus("A score could not be saved. Check your connection and try again."); });
   }, 450);
 
   function flashSave(rowEl, ok) {
@@ -810,7 +823,7 @@
     function buildTeamRows(team) {
       var bowlers = teamBowlers(team.id).sort(function (a, b) { return a.name.localeCompare(b.name); });
       if (!bowlers.length) return "";
-      var rows = '<tr><td colspan="' + (gcount + (useH ? 3 : 2)) + '" style="padding-top:16px;padding-bottom:4px;border-bottom:1px solid var(--panel-edge);font-size:13px;font-weight:600;color:var(--lane);">' + escapeHtml(team.name) + "</td></tr>";
+      var rows = '<tr><td colspan="' + (gcount + 2) + '" style="padding-top:16px;padding-bottom:4px;border-bottom:1px solid var(--panel-edge);font-size:13px;font-weight:600;color:var(--lane);">' + escapeHtml(team.name) + "</td></tr>";
       bowlers.forEach(function (b) {
         var doc = scoreDocFor(week.id, b.id);
         var games = doc ? doc.games.slice() : [];
@@ -924,10 +937,7 @@
       var series = valid.length ? valid.reduce(function (a, g) { return a + g; }, 0) : null;
       var derivedCells = rowEl.querySelectorAll("td.derived.num");
       if (derivedCells[0]) derivedCells[0].textContent = series !== null ? series : "–";
-      if (derivedCells[1]) {
-        var hdcp = bowlerHandicap(bowlerId, weekId);
-        derivedCells[1].textContent = series !== null ? (series + hdcp * games.length) : "–";
-      }
+      if (derivedCells[1]) derivedCells[1].textContent = "team";
       saveScoreDebounced(weekId + "_" + bowlerId, weekId, bowlerId, games, rowEl);
     }
 
@@ -985,7 +995,13 @@
   function addMatchup(weekId, teamA, teamB) {
     var w = byId(state.weeks, weekId);
     if (!w) return;
-    var matchups = (w.matchups || []).concat([{ teamA: teamA, teamB: teamB }]);
+    if (teamA === teamB) { setStatus("Choose two different teams."); return; }
+    var existingMatchups = w.matchups || [];
+    if (existingMatchups.some(function(m){ return m.teamA===teamA || m.teamB===teamA || m.teamA===teamB || m.teamB===teamB; })) {
+      setStatus("Each team can only appear once in a weekly matchup."); return;
+    }
+    setStatus("");
+    var matchups = existingMatchups.concat([{ teamA: teamA, teamB: teamB }]);
     if (!db) { w.matchups = matchups; renderEntry(); return; }
     db.collection("weeks").doc(weekId).update({ matchups: matchups }).catch(function () {});
   }
@@ -1283,9 +1299,7 @@
       while (games.length < gcount) games.push(null);
       var valid = games.filter(function (v) { return typeof v === "number"; });
       var series = valid.length ? valid.reduce(function (a2, v) { return a2 + v; }, 0) : null;
-      var hdcp = bowlerHandicap(b.id, weekId);
-      var hdcpSeries = series !== null ? series + hdcp * gcount : null;
-      return { bowler: b, games: games, series: series, hdcp: hdcp, hdcpSeries: hdcpSeries };
+      return { bowler:b, games:games, series:series };
     });
   }
 
@@ -1311,12 +1325,12 @@
     var rows = weekBowlerRows(teamId, weekId);
     var gh = "";
     for (var g = 0; g < gcount; g++) gh += "<th>G" + (g + 1) + "</th>";
-    var html = '<table class="mini-roster"><thead><tr><th class="name-th">Name</th>' + gh + '<th>Ser</th>' + (useH ? '<th>Hdcp</th>' : '') + '</tr></thead><tbody>';
+    var html = '<table class="mini-roster"><thead><tr><th class="name-th">Name</th>' + gh + '<th>Ser</th>' + '</tr></thead><tbody>';
     rows.forEach(function (r) {
       html += '<tr><td class="name-td">' + escapeHtml(r.bowler.name) + '</td>';
       r.games.forEach(function (v) { html += '<td class="num">' + (typeof v === "number" ? v : "–") + '</td>'; });
       html += '<td class="num series-td">' + (r.series !== null ? r.series : "–") + '</td>';
-      if (useH) html += '<td class="num">' + (r.hdcpSeries !== null ? r.hdcpSeries : "–") + '</td>';
+
       html += '</tr>';
     });
     if (!rows.length) html += '<tr><td colspan="' + (gcount + (useH ? 3 : 2)) + '" style="text-align:left;color:var(--ink-faint);padding:6px 2px">No bowlers on this team yet.</td></tr>';
@@ -1424,9 +1438,11 @@
       html += '<p style="font-size:13px;color:var(--ink-soft);margin:-10px 0 18px 0;">Points include each team\'s carried-in total from before this app — set or adjust it per team in Setup.</p>';
     }
     html += '<h2 class="block-title">Points standings</h2>';
+    html += '<p class="rule-note">Handicap: 90% of the difference between matchup teams\' incoming averages. It is set before the week and stays the same for all games.</p>';
     html += '<table class="standings"><thead><tr><th class="rank">#</th><th>Team</th><th class="num-col">Points</th></tr></thead><tbody>';
     rows.forEach(function (r, i) {
-      html += '<tr><td class="rank">' + (i + 1) + '</td><td>' + escapeHtml(r.team.name) + '</td><td class="num-col num">' + r.points + '</td></tr>';
+      html += '<tr class="team-row-clickable" data-team-detail="' + r.team.id + '"><td class="rank">' + (i + 1) + '</td><td><span class="disclosure-icon">▸</span>' + escapeHtml(r.team.name) + '</td><td class="num-col num">' + r.points + '</td></tr>';
+      html += '<tr data-team-detail-row="' + r.team.id + '" style="display:none"><td colspan="3"><div class="team-detail">' + teamDetailHtml(r.team.id) + '</div></td></tr>';
     });
     html += '</tbody></table>';
 
@@ -1445,6 +1461,21 @@
     html += '</div>';
 
     el.innerHTML = html;
+    function openTeam(id) {
+      el.querySelectorAll("[data-team-detail-row]").forEach(function(x){x.style.display="none";});
+      el.querySelectorAll(".team-row-clickable").forEach(function(x){x.classList.remove("expanded");});
+      var row=el.querySelector('[data-team-detail="'+id+'"]'), detail=el.querySelector('[data-team-detail-row="'+id+'"]');
+      if(row&&detail){row.classList.add("expanded");detail.style.display="";state.expandedTeamId=id;}
+    }
+    if(state.expandedTeamId) openTeam(state.expandedTeamId);
+    el.querySelectorAll("[data-team-detail]").forEach(function(row){row.addEventListener("click",function(){var id=row.getAttribute("data-team-detail"); if(state.expandedTeamId===id){state.expandedTeamId=null;var d=el.querySelector('[data-team-detail-row="'+id+'"]');if(d)d.style.display="none";row.classList.remove("expanded");}else openTeam(id);});});
+  }
+  function teamDetailHtml(teamId) {
+    var t=byId(state.teams,teamId), roster=teamBowlers(teamId).slice().sort(function(a,b){return a.name.localeCompare(b.name);});
+    var html='<strong>'+escapeHtml(t?t.name:"Team")+'</strong><div class="team-roster-grid">';
+    roster.forEach(function(b){html+='<div class="team-roster-person"><strong>'+escapeHtml(b.name)+'</strong><div style="font-size:12px;color:var(--ink-soft);margin-top:4px">Avg <span class="num">'+round1(bowlerAverage(b.id))+'</span> · '+bowlerGamesCount(b.id)+' games<br>High '+(bowlerHighGame(b.id)===null?"–":bowlerHighGame(b.id))+' · Series '+(bowlerHighSeries(b.id)===null?"–":bowlerHighSeries(b.id))+'</div></div>';});
+    if(!roster.length) html+='<span style="color:var(--ink-faint)">No bowlers assigned.</span>';
+    return html+'</div>';
   }
   function tile(label, value, sub) {
     return '<div class="tile"><div class="tile-label">' + escapeHtml(label) + '</div><div class="tile-value num">' + escapeHtml(value) + '</div>' +
@@ -1582,8 +1613,7 @@
     html += '<div class="field"><label>Games per week</label><input type="number" id="gamesPerWeek" min="1" max="6" value="' + s.gamesPerWeek + '" style="width:80px"></div>';
     html += '<div class="field"><label>Scoring</label><select id="scratchToggle"><option value="handicap"' + (!s.scratchLeague ? ' selected' : '') + '>Handicap</option><option value="scratch"' + (s.scratchLeague ? ' selected' : '') + '>Scratch</option></select></div>';
     if (!s.scratchLeague) {
-      html += '<div class="field"><label>Legacy handicap base</label><input type="number" id="hdcpBase" value="' + s.handicapBase + '" style="width:90px"></div>';
-      html += '<div class="field"><label>Team handicap %</label><input type="number" id="hdcpPct" min="0" max="100" value="' + Math.round(s.handicapPercent * 100) + '" style="width:80px"></div>';
+      html += '<div class="field" style="max-width:430px"><label>Team handicap rule</label><div style="font-size:13px;color:var(--ink-soft);line-height:1.45">90% of the difference between the two teams\' incoming weekly averages. The lower-average team receives those pins every game, and the handicap stays fixed for all 3 games.</div></div>';
     }
     html += '</div><button class="btn btn-sm" id="saveFormatBtn">Save format</button></section>';
 
@@ -1626,12 +1656,7 @@
     if (saveFmt) saveFmt.addEventListener("click", function () {
       var gpw = parseInt(document.getElementById("gamesPerWeek").value, 10) || 3;
       var scratch = document.getElementById("scratchToggle").value === "scratch";
-      var base = s.handicapBase, pct = s.handicapPercent;
-      var baseInp = document.getElementById("hdcpBase");
-      var pctInp = document.getElementById("hdcpPct");
-      if (baseInp) base = parseInt(baseInp.value, 10) || s.handicapBase;
-      if (pctInp) pct = (parseInt(pctInp.value, 10) || Math.round(s.handicapPercent * 100)) / 100;
-      state.settings = { leagueName: s.leagueName, gamesPerWeek: gpw, scratchLeague: scratch, handicapBase: base, handicapPercent: pct };
+      state.settings = { leagueName:s.leagueName, gamesPerWeek:gpw, scratchLeague:scratch, handicapBase:s.handicapBase, handicapPercent:0.9 };
       saveSettings();
       renderSetup();
     });
@@ -1817,7 +1842,7 @@
           leagueName: d.leagueName || "League Night",
           gamesPerWeek: d.gamesPerWeek || 3,
           handicapBase: typeof d.handicapBase === "number" ? d.handicapBase : 220,
-          handicapPercent: typeof d.handicapPercent === "number" ? d.handicapPercent : 0.9,
+          handicapPercent: 0.9,
           scratchLeague: !!d.scratchLeague
         };
       }
@@ -1831,7 +1856,7 @@
       }
       if (!subscribeAll._lastSettingsSignature) subscribeAll._lastSettingsSignature = settingsSignature;
       checkReady();
-    }, function () { loadedFlags.settings = true; checkReady(); }));
+    }, function (e) { state.lastSyncError=String(e); setStatus("Could not sync league settings."); loadedFlags.settings = true; checkReady(); }));
 
     unsubs.push(db.collection("teams").onSnapshot(function (snap) {
       var nextTeams = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
