@@ -1106,8 +1106,32 @@
       });
       if(!valid){setStatus("Every imported game must be a number from 0 to 300.");return;}
       if(!confirm("Save these "+(pending.length*state.settings.gamesPerWeek)+" game scores to Week "+week.number+"?"))return;
-      var jobs=pending.map(function(p){var id=week.id+"__"+p.bowler.id,payload={weekId:week.id,bowlerId:p.bowler.id,games:p.games,updatedAt:Date.now()}; return db.collection("scores").doc(id).set(payload);});
-      Promise.all(jobs).then(function(){setStatus("");box.innerHTML='<div class="ok"><strong>Scores saved.</strong> The matchup will update as the league data syncs.</div>';}).catch(function(){setStatus("Some imported scores could not be saved. Please verify the matchup before continuing.");});
+      if(!db){setStatus("League data is not connected, so these scores cannot be saved.");return;}
+      var btn=document.getElementById("confirmOcrBtn"); if(btn){btn.disabled=true;btn.textContent="Saving…";}
+      state.pendingScoreSaves+=pending.length;
+      setStatus("Saving imported scores…");
+      var jobs=pending.map(function(p){
+        var id=week.id+"_"+p.bowler.id;
+        var payload={weekId:week.id,bowlerId:p.bowler.id,games:p.games,updatedAt:Date.now()};
+        return db.collection("scores").doc(id).set(payload).then(function(res){
+          if(res && res.error) throw new Error(res.error);
+          var existing=scoreDocFor(week.id,p.bowler.id);
+          if(existing){existing.games=p.games.slice();existing.updatedAt=payload.updatedAt;}
+          else state.scores.push(Object.assign({id:id},payload));
+        });
+      });
+      Promise.all(jobs).then(function(){
+        state.pendingScoreSaves=Math.max(0,state.pendingScoreSaves-pending.length);
+        state.scorePhotoBusy=false;
+        setStatus("Imported scores saved.");
+        box.innerHTML='<div class="ok"><strong>Scores saved.</strong> '+pending.length+' bowlers were written to Week '+week.number+'.</div>';
+        setTimeout(function(){if(currentTabName()==="entry")renderEntry();},700);
+      }).catch(function(err){
+        state.pendingScoreSaves=Math.max(0,state.pendingScoreSaves-pending.length);
+        state.lastSyncError=String(err);
+        setStatus("Imported scores were not saved: "+(err&&err.message?err.message:"connection error"));
+        if(btn){btn.disabled=false;btn.textContent="Confirm & save scores";}
+      });
     };
   }
 
@@ -1911,7 +1935,8 @@
         return fetch(apiUrl + "?" + new URLSearchParams(params)).then(function (r) { return r.json(); });
       }
       return fetch(apiUrl, { method: "POST", body: JSON.stringify(Object.assign({}, params, { data: body })) })
-        .then(function (r) { return r.json(); });
+         .then(function (r) { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+        .then(function(res){ if(res && res.error) throw new Error(String(res.error)); return res; });
     }
     function docRef(collectionName, id) {
       return {
