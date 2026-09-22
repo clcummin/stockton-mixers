@@ -300,7 +300,16 @@
   tr.bowler-row-clickable { cursor: pointer; }
   tr.bowler-row-clickable:hover td { background: var(--bg-alt); }
   tr.bowler-detail-row td { padding: 0; }
-  .bowler-detail-inner { padding: 4px 8px 16px 8px; background: var(--bg-alt); }
+  .bowler-detail-inner { padding: 14px; background: var(--bg-alt); }
+  .bowler-profile-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; margin-bottom:14px; flex-wrap:wrap; }
+  .bowler-profile-name { font-size:18px; font-weight:700; }
+  .bowler-profile-team { font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
+  .bowler-profile-stats { display:grid; grid-template-columns:repeat(4,minmax(90px,1fr)); gap:8px; margin-bottom:14px; }
+  .bowler-profile-stat { background:var(--panel); border:1px solid var(--panel-edge); border-radius:var(--radius-sm); padding:10px; }
+  .bowler-profile-stat span { display:block; font-size:10.5px; color:var(--ink-faint); margin-bottom:4px; }
+  .bowler-profile-stat strong { font-size:17px; }
+  .trend-up { color:var(--up); } .trend-down { color:var(--down); }
+  @media (max-width:640px) { .bowler-profile-stats { grid-template-columns:repeat(2,1fr); } }
   table.week-log { width: 100%; border-collapse: collapse; margin-top: 6px; }
   table.week-log th { font-size: 10.5px; color: var(--ink-faint); font-weight: 600; text-align: center; padding: 5px 4px; }
   table.week-log th.week-th { text-align: left; }
@@ -1498,31 +1507,48 @@
   }
 
   function bowlerDetailHtml(bowlerId) {
+    var bowler = byId(state.bowlers, bowlerId);
+    if (!bowler) return "";
+    var team = byId(state.teams, bowler.teamId);
     var useH = !state.settings.scratchLeague;
     var gcount = state.settings.gamesPerWeek;
     var weeksSorted = state.weeks.slice().sort(function (a, b) { return a.number - b.number; });
-    var gh = "";
-    for (var g = 0; g < gcount; g++) gh += "<th>G" + (g + 1) + "</th>";
-    var rowsHtml = "";
-    var any = false;
+    var played = [], allGames = [];
     weeksSorted.forEach(function (w) {
       var doc = scoreDocFor(w.id, bowlerId);
       if (!doc) return;
       var valid = (doc.games || []).filter(function (v) { return typeof v === "number"; });
       if (!valid.length) return;
-      any = true;
-      var series = valid.reduce(function (a, v) { return a + v; }, 0);
-      var hdcp = bowlerHandicap(bowlerId, null);
-      rowsHtml += '<tr><td class="week-td">Week ' + w.number + (w.date ? " · " + fmtDate(w.date) : "") + '</td>';
-      var games = doc.games.slice();
-      while (games.length < gcount) games.push(null);
-      games.forEach(function (v) { rowsHtml += '<td class="num">' + (typeof v === "number" ? v : "–") + '</td>'; });
-      rowsHtml += '<td class="num" style="font-weight:600">' + series + '</td>';
-      if (useH) rowsHtml += '<td class="num">' + (series + hdcp * gcount) + '</td>';
+      valid.forEach(function(v){ allGames.push(v); });
+      played.push({ week:w, games:doc.games.slice(), valid:valid, series:valid.reduce(function(a,v){return a+v;},0) });
+    });
+    var avg = bowlerAverage(bowlerId), hdcp = bowlerHandicap(bowlerId, null);
+    var high = bowlerHighGame(bowlerId), highSeries = bowlerHighSeries(bowlerId);
+    var recentGames = [];
+    played.slice(-3).forEach(function(p){ p.valid.forEach(function(v){recentGames.push(v);}); });
+    var recentAvg = recentGames.length ? recentGames.reduce(function(a,v){return a+v;},0)/recentGames.length : null;
+    var trend = recentAvg === null ? null : round1(recentAvg-avg);
+    var profile = '<div class="bowler-profile-head"><div><div class="bowler-profile-name">'+escapeHtml(bowler.name)+'</div><div class="bowler-profile-team">'+escapeHtml(team?team.name:"No team")+' · '+allGames.length+' games bowled</div></div></div>';
+    profile += '<div class="bowler-profile-stats">' +
+      '<div class="bowler-profile-stat"><span>Season average</span><strong class="num">'+round1(avg)+'</strong></div>' +
+      (useH?'<div class="bowler-profile-stat"><span>Handicap</span><strong class="num">'+hdcp+'</strong></div>':'') +
+      '<div class="bowler-profile-stat"><span>High game</span><strong class="num">'+(high===null?"–":high)+'</strong></div>' +
+      '<div class="bowler-profile-stat"><span>High series</span><strong class="num">'+(highSeries===null?"–":highSeries)+'</strong></div>' +
+      '<div class="bowler-profile-stat"><span>Last 3 weeks</span><strong class="num">'+(recentAvg===null?"–":round1(recentAvg))+'</strong></div>' +
+      '<div class="bowler-profile-stat"><span>Recent vs season</span><strong class="num '+(trend>0?"trend-up":trend<0?"trend-down":"")+'">'+(trend===null?"–":(trend>0?"+":"")+trend)+'</strong></div>' +
+      '</div>';
+    if (!played.length) return profile + '<p style="font-size:13px;color:var(--ink-faint);padding:8px 4px">No games logged yet for this bowler.</p>';
+    var gh = ""; for (var g=0;g<gcount;g++) gh += "<th>G"+(g+1)+"</th>";
+    var rowsHtml = "";
+    played.slice().reverse().forEach(function(p) {
+      rowsHtml += '<tr><td class="week-td">Week '+p.week.number+(p.week.date?" · "+fmtDate(p.week.date):"")+'</td>';
+      var games=p.games.slice(); while(games.length<gcount) games.push(null);
+      games.forEach(function(v){ rowsHtml += '<td class="num">'+(typeof v==="number"?v:"–")+'</td>'; });
+      rowsHtml += '<td class="num" style="font-weight:600">'+p.series+'</td>';
+      if(useH) rowsHtml += '<td class="num">'+(p.series+hdcp*gcount)+'</td>';
       rowsHtml += '</tr>';
     });
-    if (!any) return '<p style="font-size:13px;color:var(--ink-faint);padding:8px 4px">No games logged yet for this bowler.</p>';
-    return '<table class="week-log"><thead><tr><th class="week-th">Week</th>' + gh + '<th>Series</th>' + (useH ? '<th>Hdcp series</th>' : '') + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+    return profile + '<table class="week-log"><thead><tr><th class="week-th">Week</th>'+gh+'<th>Series</th>'+(useH?'<th>Hdcp series</th>':'')+'</tr></thead><tbody>'+rowsHtml+'</tbody></table>';
   }
 
   // ---------------------------------------------------------------
